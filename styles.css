@@ -1,0 +1,981 @@
+  :root{
+    --bg-deep:#15241b;
+    --bg-moss:#1d2f23;
+    --board:#243a2b;
+    --cell:#2c4634;
+    --cell-alt:#2a4231;
+    --cream:#f2edde;
+    --cream-dim:#c9c4b0;
+    --gold:#e5b954;
+    --berry-red:#c8443c;
+    --blue:#6b7fc4;
+    --shadow:rgba(0,0,0,.45);
+  }
+
+  *{ margin:0; padding:0; box-sizing:border-box; }
+
+  html,body{ height:100%; }
+
+  body{
+    font-family:"Manrope","Segoe UI",system-ui,sans-serif;
+    background:
+      radial-gradient(1200px 700px at 50% -10%, #27402e 0%, transparent 60%),
+      var(--bg-deep);
+    color:var(--cream);
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    min-height:100%;
+    padding:18px 12px 28px;
+    -webkit-tap-highlight-color:transparent;
+    touch-action:manipulation;
+    overflow-x:hidden;
+  }
+
+  /* ---------- Header ---------- */
+  header{ text-align:center; margin-bottom:8px; user-select:none; }
+
+  h1{
+    font-family:Georgia,"Times New Roman",serif;
+    font-weight:700;
+    font-size:clamp(2rem, 7vw, 2.9rem);
+    letter-spacing:.22em;
+    color:var(--gold);
+    text-shadow:0 2px 0 rgba(0,0,0,.35);
+  }
+  h1 .leaf{ color:#7fae6f; font-size:.6em; vertical-align:.35em; letter-spacing:0; }
+
+  .tagline{
+    margin-top:2px;
+    font-size:.85rem;
+    color:var(--cream-dim);
+    letter-spacing:.06em;
+  }
+
+  /* ---------- Stats ---------- */
+  .stats{
+    display:flex;
+    gap:10px;
+    margin-bottom:6px;
+    width:min(92vw, 460px);
+    position:sticky;
+    top:6px;
+    z-index:9;
+  }
+  .stats .stat{
+    background:rgba(26,44,32,.94);
+    backdrop-filter:blur(4px);
+    box-shadow:0 3px 10px rgba(0,0,0,.35);
+  }
+  .stat.inv{
+    flex:none;
+    font:inherit;
+    color:var(--cream);
+    cursor:pointer;
+    padding:8px 10px 9px;
+    border:1px solid #35543e;
+    min-width:58px;
+  }
+  .stat.inv .value{ font-size:.95rem; letter-spacing:.02em; white-space:nowrap; }
+  .stat.inv.hidden{ display:none; }
+  .inv-count{
+    font-size:.7rem;
+    color:var(--cream-dim);
+  }
+  .stat{
+    flex:1;
+    position:relative;
+    background:var(--bg-moss);
+    border:1px solid #35543e;
+    border-radius:12px;
+    padding:8px 6px 9px;
+    text-align:center;
+    box-shadow:0 3px 8px var(--shadow);
+  }
+  .stat .label{
+    font-size:.66rem;
+    text-transform:uppercase;
+    letter-spacing:.14em;
+    color:var(--cream-dim);
+  }
+  .stat .value{
+    font-size:1.35rem;
+    font-weight:800;
+    font-variant-numeric:tabular-nums;
+    margin-top:1px;
+  }
+  .stat .value.moves-low{ color:var(--berry-red); animation:lowPulse 1s ease-in-out infinite; }
+  @keyframes lowPulse{ 50%{ opacity:.55; } }
+
+  .dmgfloat{
+    position:absolute;
+    right:8px; top:4px;
+    font-size:.8rem;
+    font-weight:800;
+    color:#8fd08a;
+    pointer-events:none;
+    animation:plusFloat .9s ease-out forwards;
+  }
+  @keyframes plusFloat{
+    0%{ opacity:0; transform:translateY(6px); }
+    20%{ opacity:1; }
+    100%{ opacity:0; transform:translateY(-14px); }
+  }
+
+  /* ---------- Taival: tasot ja tavoitteet ---------- */
+
+  #hudrow{
+    flex:none;
+    display:flex;
+    flex-wrap:nowrap;
+    align-items:center;
+    gap:10px;
+    width:fit-content;
+    max-width:min(92vw, 460px);
+    margin:0 auto 8px;
+    overflow-x:auto;
+    scrollbar-width:none;
+    -webkit-overflow-scrolling:touch;
+    padding-bottom:2px;
+  }
+  #hudrow::-webkit-scrollbar{ display:none; }
+  #hudrow:not(:has(> :not(.hidden))){ display:none; }
+  .goals{
+    flex:none;
+    display:flex;
+    flex-wrap:nowrap;
+    gap:8px;
+  }
+  .goals .chip{ flex:none; }
+  .goals.perks .chip{
+    font:inherit;
+    font-size:.9rem;
+    cursor:pointer;
+    padding:4px 8px;
+  }
+  .goals.perks .chip b{
+    font-size:.68rem;
+    color:var(--cream-dim);
+    margin-left:2px;
+  }
+  .goals.hidden{ display:none; }
+  .goals .chip{
+    display:flex;
+    align-items:center;
+    gap:4px;
+    background:var(--bg-moss);
+    border:1px solid #35543e;
+    border-radius:999px;
+    padding:4px 12px 4px 6px;
+    font-weight:800;
+    font-size:.9rem;
+    font-variant-numeric:tabular-nums;
+  }
+  .goals .chip.done{ border-color:var(--gold); color:var(--gold); }
+  .goals .ci{ width:22px; height:22px; display:inline-block; }
+  .goals .ci svg{ width:100%; height:100%; display:block; }
+
+  .mosscell{
+    position:absolute;
+    border-radius:10px;
+    z-index:1;
+    pointer-events:none;
+    background:
+      radial-gradient(circle at 30% 30%, #5c8046 0 22%, transparent 23%),
+      radial-gradient(circle at 72% 38%, #69904f 0 18%, transparent 19%),
+      radial-gradient(circle at 45% 72%, #557a41 0 24%, transparent 25%),
+      #4a6b3a;
+    box-shadow:inset 0 0 0 2px rgba(30,45,25,.55);
+  }
+  .mosscell.m2{ filter:brightness(.72) saturate(1.15); box-shadow:inset 0 0 0 3px rgba(18,30,14,.75); }
+  .mosscell.grow{ animation:mossGrow .5s ease; }
+  @keyframes mossGrow{ from{ transform:scale(.2); opacity:0; } }
+
+  .tile .ice{
+    position:absolute;
+    inset:5%;
+    border-radius:10px;
+    z-index:2;
+    pointer-events:none;
+    background:linear-gradient(135deg, rgba(212,236,255,.5), rgba(140,190,230,.3) 55%, rgba(224,242,255,.5));
+    border:2px solid rgba(222,242,255,.7);
+    box-shadow:inset 0 0 8px rgba(255,255,255,.45);
+  }
+  .tile .ice::after{
+    content:"❄";
+    position:absolute;
+    right:7%; top:1%;
+    font-size:.85rem;
+    color:rgba(242,250,255,.9);
+    text-shadow:0 1px 2px rgba(40,80,120,.5);
+  }
+  .tile.deny svg:first-child{ animation:denyShake .3s ease; }
+  @keyframes denyShake{
+    0%,100%{ transform:translateX(0); }
+    25%{ transform:translateX(-9%); }
+    60%{ transform:translateX(8%); }
+  }
+
+  /* ---------- Board ---------- */
+  .board-wrap{ position:relative; width:min(92vw, 460px); }
+
+  .board{
+    position:relative;
+    width:100%;
+    aspect-ratio:1/1;
+    background:var(--board);
+    border:1px solid #3a5a44;
+    border-radius:16px;
+    box-shadow:0 10px 30px var(--shadow), inset 0 0 0 6px rgba(0,0,0,.12);
+    overflow:hidden;
+    touch-action:none;
+  }
+
+  .cellbg{
+    position:absolute;
+    border-radius:10px;
+    background:var(--cell);
+  }
+  .cellbg.alt{ background:var(--cell-alt); }
+
+  .tile{
+    position:absolute;
+    left:0; top:0;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    cursor:pointer;
+    will-change:transform;
+    transition:transform .22s cubic-bezier(.3,.9,.4,1.1);
+    z-index:2;
+  }
+  .tile svg{
+    width:78%; height:78%;
+    filter:drop-shadow(0 2px 2px rgba(0,0,0,.35));
+    pointer-events:none;
+  }
+  .tile.selected{ z-index:3; }
+  .tile.selected svg:first-child{
+    transform:scale(1.14);
+    filter:drop-shadow(0 0 8px rgba(229,185,84,.9)) drop-shadow(0 2px 3px rgba(0,0,0,.4));
+  }
+  .tile.falling{ transition:transform .3s cubic-bezier(.35,.1,.55,1.25); }
+  .tile.pop{
+    transition:transform .22s ease-in, opacity .22s ease-in;
+    transform:scale(0) !important;
+    opacity:0;
+  }
+  .no-anim .tile{ transition:none !important; }
+
+  /* ---------- Erikoispalat ---------- */
+  .tile.sp::before{
+    content:"";
+    position:absolute;
+    inset:14%;
+    border-radius:50%;
+    box-shadow:0 0 10px 4px rgba(229,185,84,.4);
+    animation:spPulse 1.5s ease-in-out infinite;
+  }
+  @keyframes spPulse{
+    50%{ box-shadow:0 0 16px 7px rgba(229,185,84,.65); }
+  }
+  .tile.wild::before{
+    box-shadow:0 0 14px 6px rgba(255,232,160,.6);
+    animation:wildPulse 2.4s linear infinite;
+  }
+  @keyframes wildPulse{
+    0%,100%{ filter:hue-rotate(0deg); box-shadow:0 0 14px 6px rgba(255,232,160,.6); }
+    50%{ filter:hue-rotate(45deg); box-shadow:0 0 20px 9px rgba(255,232,160,.8); }
+  }
+  .tile svg.badge{
+    position:absolute;
+    width:42%; height:42%;
+    right:1%; bottom:1%;
+    filter:drop-shadow(0 1px 2px rgba(0,0,0,.55));
+  }
+  .tile.born svg:first-child{ animation:bornPop .4s ease; }
+  @keyframes bornPop{
+    0%{ transform:scale(.2) rotate(-20deg); }
+    65%{ transform:scale(1.25) rotate(6deg); }
+    100%{ transform:scale(1) rotate(0); }
+  }
+
+  /* ---------- Vihje ---------- */
+  .tile.hint{ z-index:3; }
+  .tile.hint svg:first-child{
+    animation:hintWiggle 1.6s ease;
+    filter:drop-shadow(0 0 7px rgba(242,237,222,.75)) drop-shadow(0 2px 2px rgba(0,0,0,.35));
+  }
+  @keyframes hintWiggle{
+    0%,100%{ transform:scale(1); }
+    15%,45%,75%{ transform:scale(1.18); }
+    30%,60%{ transform:scale(.94); }
+  }
+
+  /* ---------- Tehosteet ---------- */
+  .fx{ position:absolute; pointer-events:none; z-index:5; }
+  .fx.beam-h{
+    left:0; width:100%;
+    background:linear-gradient(90deg, transparent, rgba(229,185,84,.9) 30%, rgba(229,185,84,.9) 70%, transparent);
+    border-radius:8px;
+    animation:fxFade .55s ease-out forwards;
+  }
+  .fx.beam-v{
+    top:0; height:100%;
+    background:linear-gradient(180deg, transparent, rgba(229,185,84,.9) 30%, rgba(229,185,84,.9) 70%, transparent);
+    border-radius:8px;
+    animation:fxFade .55s ease-out forwards;
+  }
+  .fx.boom{
+    border-radius:50%;
+    background:radial-gradient(circle, rgba(255,225,150,.95), rgba(200,68,60,.4) 55%, transparent 72%);
+    animation:fxBoom .55s ease-out forwards;
+  }
+  .fx.flash{
+    inset:0;
+    background:radial-gradient(circle, rgba(255,235,170,.55), transparent 70%);
+    animation:fxFade .65s ease-out forwards;
+  }
+  @keyframes fxFade{ from{ opacity:1; } to{ opacity:0; } }
+  @keyframes fxBoom{
+    0%{ transform:scale(.25); opacity:1; }
+    100%{ transform:scale(1.15); opacity:0; }
+  }
+
+  .sel-ring{
+    position:absolute;
+    border:3px solid var(--gold);
+    border-radius:12px;
+    pointer-events:none;
+    z-index:4;
+    box-shadow:0 0 12px rgba(229,185,84,.5);
+    display:none;
+  }
+  .cursor-ring{
+    position:absolute;
+    border:2px dashed rgba(242,237,222,.75);
+    border-radius:12px;
+    pointer-events:none;
+    z-index:4;
+    display:none;
+  }
+  .board.kb .cursor-ring{ display:block; }
+
+  /* ---------- Chain banner ---------- */
+  .banner{
+    position:absolute;
+    left:50%; top:42%;
+    transform:translate(-50%,-50%) scale(.6);
+    font-family:Georgia,serif;
+    font-weight:700;
+    font-size:clamp(1.4rem, 6vw, 2.2rem);
+    color:var(--gold);
+    text-shadow:0 2px 0 rgba(0,0,0,.5), 0 0 18px rgba(229,185,84,.45);
+    opacity:0;
+    pointer-events:none;
+    z-index:6;
+    white-space:nowrap;
+  }
+  .banner.show{ animation:bannerPop 1s ease forwards; }
+  @keyframes bannerPop{
+    0%{ opacity:0; transform:translate(-50%,-50%) scale(.6); }
+    18%{ opacity:1; transform:translate(-50%,-50%) scale(1.05); }
+    70%{ opacity:1; transform:translate(-50%,-58%) scale(1); }
+    100%{ opacity:0; transform:translate(-50%,-70%) scale(1); }
+  }
+
+  /* ---------- Overlay ---------- */
+  .overlay{
+    position:absolute;
+    inset:0;
+    background:rgba(13,22,16,.88);
+    backdrop-filter:blur(3px);
+    border-radius:16px;
+  }
+  /* päävalikko irtoaa laudasta koko ruudun kokoiseksi */
+  .overlay.menu{
+    position:fixed;
+    border-radius:0;
+    justify-content:flex-start;
+    overflow-y:auto;
+    padding:max(24px, env(safe-area-inset-top)) 16px
+            max(24px, env(safe-area-inset-bottom));
+  }
+  .overlay.menu #ovTitle{ margin-top:4vh; }
+  .overlay-dummy{ display:none; }
+  .overlay{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    text-align:center;
+    gap:10px;
+    z-index:10;
+    opacity:0;
+    pointer-events:none;
+    transition:opacity .35s ease;
+    padding:20px;
+  }
+  .overlay.show{ opacity:1; pointer-events:auto; }
+  .overlay h2{
+    font-family:Georgia,serif;
+    font-size:1.9rem;
+    color:var(--gold);
+    letter-spacing:.04em;
+  }
+  .overlay .final{ font-size:1.05rem; line-height:1.7; color:var(--cream); }
+  .overlay .final b{ font-variant-numeric:tabular-nums; }
+  .overlay .record{ color:#8fd08a; font-weight:700; }
+  .overlay .ovstars{
+    font-size:2rem;
+    letter-spacing:.18em;
+    display:inline-block;
+  }
+  .overlay .ovstars span{ color:#54604d; }
+  .overlay .ovstars span.on{ color:var(--gold); text-shadow:0 0 14px rgba(229,185,84,.55); }
+
+  /* ---------- Buttons & footer ---------- */
+  button.btn{
+    font:inherit;
+    font-weight:800;
+    letter-spacing:.05em;
+    background:var(--gold);
+    color:#3a2c10;
+    border:none;
+    border-radius:999px;
+    padding:11px 26px;
+    cursor:pointer;
+    box-shadow:0 4px 0 #a37f2c, 0 6px 14px var(--shadow);
+    transition:transform .08s ease, box-shadow .08s ease;
+  }
+  button.btn:active{ transform:translateY(3px); box-shadow:0 1px 0 #a37f2c; }
+  button.btn:focus-visible{ outline:3px solid var(--cream); outline-offset:3px; }
+
+  .controls{
+    margin-top:14px;
+    display:flex;
+    flex-wrap:wrap;
+    justify-content:center;
+    align-items:center;
+    gap:10px;
+  }
+  .controls .btn.small{ padding:8px 20px; font-size:.9rem; }
+  .controls .btn.iconbtn{
+    padding:8px 0;
+    width:44px;
+    font-size:1.05rem;
+    border-radius:50%;
+    line-height:1;
+    transition:opacity .15s ease;
+  }
+  .controls .btn.iconbtn[aria-pressed="false"]{ opacity:.5; }
+
+  /* ---------- Poimijan opas: puinen viitta ja opastaulu ---------- */
+  .guide-btn{
+    margin-top:20px;
+    position:relative;
+    flex:none;
+    width:132px;
+    min-width:132px;
+    height:96px;
+    min-height:96px;
+    border:none;
+    background:transparent;
+    cursor:pointer;
+    padding:0;
+    transform:rotate(-1.4deg);
+    transition:transform .16s ease;
+    filter:drop-shadow(0 7px 12px var(--shadow));
+  }
+  .guide-btn:hover{ transform:rotate(0deg) scale(1.04); }
+  .guide-btn:focus-visible{ outline:3px solid var(--cream); outline-offset:5px; border-radius:5px; }
+  /* kirjan selkämys vasemmassa reunassa */
+  .guide-btn .book-spine{
+    position:absolute;
+    left:0; top:0; bottom:0;
+    width:15px;
+    border-radius:6px 3px 3px 6px;
+    background:linear-gradient(90deg, #3a2413, #57351c 55%, #4a2c17);
+    box-shadow:inset -2px 0 3px rgba(0,0,0,.5), inset 1px 0 0 rgba(255,220,170,.15);
+  }
+  /* sivunipun reunat selkämyksen takana */
+  .guide-btn .book-spine::after{
+    content:"";
+    position:absolute;
+    right:-4px; top:5px; bottom:5px;
+    width:5px;
+    border-radius:0 2px 2px 0;
+    background:repeating-linear-gradient(180deg, #efe4c8 0 2px, #cdbf9c 2px 4px);
+  }
+  /* nahkakansi */
+  .guide-btn .book-face{
+    position:absolute;
+    left:11px; right:0; top:0; bottom:0;
+    border-radius:3px 8px 8px 3px;
+    background:
+      repeating-linear-gradient(48deg, rgba(0,0,0,.05) 0 3px, transparent 3px 8px),
+      linear-gradient(150deg, #7c5233, #5f3d24 60%, #4f3320);
+    border:1px solid #3a2413;
+    box-shadow:inset 0 1px 0 rgba(255,225,180,.2), inset 0 -6px 14px rgba(0,0,0,.35);
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:2px;
+    font-family:Georgia,serif;
+    font-weight:700;
+    font-size:.98rem;
+    line-height:1.15;
+    letter-spacing:.05em;
+    color:#f1e2c4;
+    text-shadow:0 -1px 0 rgba(0,0,0,.5), 0 1px 0 rgba(255,230,190,.12);
+  }
+  /* kohokultauskehys */
+  .guide-btn .book-band{
+    position:absolute;
+    inset:7px 9px;
+    border:1.5px solid rgba(216,178,110,.55);
+    border-radius:2px 5px 5px 2px;
+    pointer-events:none;
+  }
+  .guide-btn .book-leaf{
+    color:#c9a45a;
+    font-size:1.05rem;
+    margin-top:3px;
+  }
+
+  .guide-overlay{
+    position:fixed;
+    inset:0;
+    background:rgba(10,18,13,.78);
+    backdrop-filter:blur(3px);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:16px;
+    z-index:100;
+    opacity:0;
+    pointer-events:none;
+    transition:opacity .25s ease;
+  }
+  .guide-overlay.show{ opacity:1; pointer-events:auto; }
+
+  .guide{
+    width:min(560px, 100%);
+    max-height:88vh;
+    overflow-y:auto;
+    background:
+      repeating-linear-gradient(88deg, rgba(0,0,0,.07) 0 2px, transparent 2px 11px),
+      linear-gradient(180deg, #7d5838, #66452a 60%, #573a22);
+    border:4px solid #462e15;
+    border-radius:14px;
+    box-shadow:0 18px 50px rgba(0,0,0,.6);
+    padding:14px;
+  }
+
+  .guide-paper{
+    background:linear-gradient(180deg, #f4efe0, #ece5d0);
+    border-radius:8px;
+    padding:20px 20px 22px;
+    color:#33402f;
+    position:relative;
+    box-shadow:inset 0 0 16px rgba(90,70,40,.22), 0 2px 6px rgba(0,0,0,.35);
+  }
+  /* punaiset nastat paperin kulmissa */
+  .guide-paper::before, .guide-paper::after{
+    content:"";
+    position:absolute;
+    top:9px;
+    width:14px; height:14px;
+    border-radius:50%;
+    background:radial-gradient(circle at 35% 30%, #e88b83, #b13c33 55%, #6f1f19);
+    box-shadow:0 2px 3px rgba(0,0,0,.45);
+  }
+  .guide-paper::before{ left:14px; }
+  .guide-paper::after{ right:14px; }
+
+  .guide h2{
+    font-family:Georgia,serif;
+    text-align:center;
+    color:#5e3f26;
+    letter-spacing:.14em;
+    font-size:1.25rem;
+    margin-bottom:2px;
+  }
+  .guide h2 .leaf{ color:#6f8f57; font-size:.7em; vertical-align:.3em; letter-spacing:0; }
+  .guide h3{
+    font-size:.76rem;
+    text-transform:uppercase;
+    letter-spacing:.15em;
+    color:#6b4a2c;
+    border-bottom:1px solid rgba(107,74,44,.35);
+    padding-bottom:3px;
+    margin:16px 0 8px;
+  }
+  .guide p, .guide li{ font-size:.88rem; line-height:1.55; }
+  .guide ul{ list-style:none; margin:0; padding:0; }
+  .guide li{ display:flex; align-items:flex-start; gap:9px; margin-bottom:8px; }
+  .guide .gi{ flex:0 0 26px; width:26px; height:26px; margin-top:1px; }
+  .guide .gi svg{ width:100%; height:100%; display:block; }
+  .guide .sp-name{ color:#9c741f; font-weight:700; }
+  .guide .plus{ color:#4a7a3c; font-weight:700; }
+  .guide kbd{
+    background:#e4dcc4;
+    border:1px solid #b8ab8a;
+    border-radius:4px;
+    padding:0 5px;
+    font-family:inherit;
+    font-size:.92em;
+    color:#4a3a20;
+  }
+  .guide-close{ display:block; margin:18px auto 0; }
+
+  /* ---------- Vaellus: varustevalinta ja sirut ---------- */
+  .draft-paper{
+    width:min(430px, 100%);
+    background:linear-gradient(180deg, #213627, #1a2c20);
+    border:2px solid #3a5a44;
+    border-radius:16px;
+    padding:18px 16px 20px;
+    box-shadow:0 18px 50px rgba(0,0,0,.6);
+    text-align:center;
+  }
+  .draft-paper h2{
+    font-family:Georgia,serif;
+    color:var(--gold);
+    letter-spacing:.1em;
+    margin-bottom:14px;
+    font-size:1.3rem;
+  }
+  .cards{ display:flex; flex-direction:column; gap:10px; }
+  .card{
+    font:inherit;
+    text-align:left;
+    display:grid;
+    grid-template-columns:44px 1fr;
+    grid-template-rows:auto auto;
+    column-gap:12px;
+    background:var(--bg-moss);
+    border:2px solid #35543e;
+    border-radius:12px;
+    color:var(--cream);
+    padding:12px 14px;
+    cursor:pointer;
+    transition:transform .12s ease, border-color .12s ease;
+  }
+  .card:hover{ transform:translateY(-2px); border-color:var(--gold); }
+  .card:focus-visible{ outline:3px solid var(--cream); outline-offset:2px; }
+  .card .cicon{ grid-row:1/3; font-size:1.7rem; align-self:center; text-align:center; }
+  /* Ikonirekisterin kääre: emoji perii fonttikoon, SVG skaalataan samaan.
+     <i>-elementti, jottei yleinen ".container span" -sääntö kutista ikonia. */
+  .ico{ display:inline-block; line-height:1; font-style:normal; }
+  .ico svg{ width:1em; height:1em; vertical-align:-.12em; }
+  .card .cname{ font-weight:800; color:var(--gold); }
+  .card .cdesc{ font-size:.85rem; color:var(--cream-dim); line-height:1.4; }
+  .card.curse{ border-color:#7a3a34; }
+  .card.curse .cname{ color:#e88b83; }
+  .card.amu .cname{ color:#8fd08a; }
+  .goals .chip .pi{ font-size:1rem; }
+  .goals.perks .chip{ font-size:.78rem; padding:4px 10px 4px 6px; }
+  .goals .chip.curse{ border-color:#7a3a34; }
+  .goals .chip.amu{ border-color:var(--gold); color:var(--gold); }
+  .card.branch{ border-color:#4a6f8a; }
+  .card.branch .cname{ color:#8fc7e8; }
+  .card.disabled{ opacity:.45; cursor:default; }
+  .card.disabled:hover{ transform:none; border-color:#35543e; }
+
+  /* ---------- Kohtaamiset ---------- */
+  .enc-head{ font-size:2.6rem; text-align:center; margin-bottom:2px; }
+  .enc-text{
+    color:var(--cream-dim);
+    font-size:.92rem;
+    line-height:1.6;
+    margin:8px 0 14px;
+    text-align:center;
+  }
+  .enc-result{
+    color:var(--cream);
+    font-size:1rem;
+    line-height:1.7;
+    text-align:center;
+    margin:12px 0 16px;
+  }
+  .enc-result b{ color:var(--gold); }
+
+  /* ---------- Matkajana ---------- */
+  .trail{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    margin-bottom:2px;
+  }
+  .trail .tnode{
+    width:22px; height:22px;
+    border-radius:50%;
+    background:var(--bg-moss);
+    border:2px solid #35543e;
+    color:var(--cream-dim);
+    font-size:.62rem;
+    font-weight:800;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    flex:none;
+  }
+  .trail .tnode.done{ background:var(--gold); border-color:#a37f2c; color:#3a2c10; }
+  .trail .tnode.cur{ border-color:var(--cream); color:var(--cream); box-shadow:0 0 7px rgba(242,237,222,.45); }
+  .trail .tnode.done.cur{ color:#3a2c10; }
+  .trail .tlink{
+    width:9px; height:2px;
+    background:rgba(242,237,222,.22);
+    flex:none;
+  }
+  .trail .tlink.done{ background:var(--gold); }
+  .trail-label{
+    text-align:center;
+    font-size:.72rem;
+    color:var(--cream-dim);
+    letter-spacing:.08em;
+    margin-bottom:10px;
+  }
+
+  /* ---------- Aitta ---------- */
+  .shop-paper{
+    max-height:min(84vh, 640px);
+    overflow-y:auto;
+  }
+  .shop-balance{
+    color:var(--gold);
+    font-weight:800;
+    margin-bottom:10px;
+    font-variant-numeric:tabular-nums;
+  }
+  .shop-section{
+    font-family:Georgia,serif;
+    color:var(--cream-dim);
+    letter-spacing:.08em;
+    font-size:.85rem;
+    margin:14px 0 8px;
+    text-transform:uppercase;
+  }
+  .card .cprice{
+    grid-row:1/3;
+    grid-column:3;
+    align-self:center;
+    font-weight:800;
+    color:var(--gold);
+    font-variant-numeric:tabular-nums;
+    white-space:nowrap;
+  }
+  .card.shopitem{ grid-template-columns:44px 1fr auto; }
+  .card.soldout .cprice{ color:#8fd08a; }
+  .charpower{
+    font-size:.8rem;
+    color:var(--cream-dim);
+    margin:-6px 0 12px;
+    min-height:1.2em;
+  }
+
+  /* ---------- Minipelit ---------- */
+  .mini-wrap{ position:relative; }
+  #miniCanvas{
+    display:block;
+    width:min(92vw, 380px);
+    height:auto;
+    border-radius:16px;
+    border:2px solid #3a5a44;
+    box-shadow:0 18px 50px rgba(0,0,0,.65);
+    touch-action:manipulation;
+  }
+  .mini-result{
+    position:absolute;
+    inset:0;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:10px;
+    text-align:center;
+    background:rgba(13,22,16,.85);
+    border-radius:16px;
+    padding:20px;
+  }
+  .mini-result.hidden{ display:none; }
+  .mini-result h2{
+    font-family:Georgia,serif;
+    color:var(--gold);
+    letter-spacing:.06em;
+    font-size:1.5rem;
+  }
+  .mini-result .lines{ color:var(--cream); line-height:1.8; font-size:1rem; }
+
+  /* ---------- Usva (akti 2) ---------- */
+  .fog{
+    position:absolute;
+    inset:6%;
+    border-radius:26%;
+    background:
+      radial-gradient(circle at 35% 30%, rgba(232,236,238,.95), rgba(178,192,198,.9) 60%, rgba(140,158,166,.88)),
+      #9fb0b6;
+    box-shadow:inset 0 -2px 5px rgba(70,90,98,.5), 0 1px 3px rgba(0,0,0,.3);
+    animation:fogDrift 3.4s ease-in-out infinite;
+  }
+  @keyframes fogDrift{
+    0%,100%{ opacity:.94; transform:scale(1); }
+    50%{ opacity:.82; transform:scale(1.04); }
+  }
+  @media (prefers-reduced-motion: reduce){
+    .fog{ animation:none; }
+  }
+
+  /* ---------- Aktien tunnelmat ---------- */
+  body.act-2{
+    background:
+      radial-gradient(1200px 700px at 50% -10%, #3a4230 0%, transparent 60%),
+      #141a12;
+  }
+  body.act-2 .board{ border-color:#4a5238; }
+  body.act-3{
+    background:
+      radial-gradient(1200px 700px at 50% -10%, #26333f 0%, transparent 60%),
+      #0d141b;
+  }
+  body.act-3 .board{ border-color:#3a4a5a; }
+
+  /* ---------- Pomotaistelu ---------- */
+  .bossbar{
+    flex:none;
+    position:relative;
+    width:min(92vw, 460px);
+    margin-bottom:5px;
+    background:var(--bg-moss);
+    border:1px solid #7a3a34;
+    border-radius:12px;
+    padding:6px 12px 7px;
+    box-shadow:0 3px 8px var(--shadow);
+  }
+  .bossbar.hidden{ display:none; }
+  .bossbar .brow{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    gap:8px;
+  }
+  .bossbar .bname{
+    font-family:Georgia,serif;
+    font-weight:700;
+    letter-spacing:.08em;
+    color:#e88b83;
+  }
+  .bossbar.enraged .bname{ color:#e8743c; animation:lowPulse 1s ease-in-out infinite; }
+  .bossbar .btele{
+    font-size:.78rem;
+    font-weight:800;
+    color:var(--cream-dim);
+    font-variant-numeric:tabular-nums;
+  }
+  .bossbar .btrack{
+    position:relative;
+    height:15px;
+    background:#0f1b14;
+    border:1px solid #46282a;
+    border-radius:999px;
+    margin-top:4px;
+    overflow:hidden;
+  }
+  .bossbar .bnum{
+    position:absolute;
+    inset:0;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-size:.62rem;
+    font-weight:800;
+    color:rgba(242,237,222,.9);
+    text-shadow:0 1px 2px rgba(0,0,0,.7);
+    font-variant-numeric:tabular-nums;
+    pointer-events:none;
+  }
+  .bossbar .bfill{
+    height:100%;
+    background:linear-gradient(90deg, #8e2a25, #c8443c);
+    border-radius:999px;
+    transition:width .3s ease;
+  }
+  .bossbar.enraged .bfill{ background:linear-gradient(90deg, #c8443c, #e8743c); }
+  .board.enrage{
+    box-shadow:0 10px 30px var(--shadow),
+      inset 0 0 44px rgba(200,68,60,.22),
+      inset 0 0 0 6px rgba(0,0,0,.12);
+  }
+
+  /* ---------- Päävalikon hahmot ---------- */
+  .charrow{
+    display:flex;
+    justify-content:center;
+    gap:10px;
+    margin-bottom:14px;
+  }
+  .char{
+    font:inherit;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:4px;
+    width:82px;
+    padding:12px 6px 10px;
+    font-size:1.7rem;
+    background:var(--bg-moss);
+    border:2px solid #35543e;
+    border-radius:12px;
+    color:var(--cream);
+    cursor:pointer;
+  }
+  .char span{
+    font-size:.66rem;
+    font-weight:800;
+    letter-spacing:.02em;
+    line-height:1.15;
+    white-space:normal;
+    hyphens:auto;
+    text-align:center;
+    max-width:100%;
+  }
+  .char.sel{ border-color:var(--gold); box-shadow:0 0 10px rgba(229,185,84,.35); }
+  .char.locked{ opacity:.45; cursor:default; }
+  .mini-result .lines b{ font-variant-numeric:tabular-nums; }
+
+  @media (max-width: 430px){
+    h1{ font-size:1.55rem; letter-spacing:.14em; }
+    .tagline{ font-size:.72rem; margin-bottom:10px; }
+    .stats{ gap:6px; }
+    .stat{ padding:6px 4px 7px; }
+    .stat .value{ font-size:1.05rem; }
+    .bossbar{ margin-bottom:8px; }
+    .char{ width:72px; padding:10px 4px 8px; font-size:1.45rem; }
+    .charrow{ gap:7px; flex-wrap:wrap; }
+    .guide-btn{ margin-top:14px; transform:rotate(-1.4deg) scale(.88); }
+    .draft-paper{ padding:14px 12px 16px; }
+    .overlay.menu .btn{ display:block; margin:8px auto 0; width:min(260px, 80vw); }
+  }
+
+  @media (max-height: 760px){
+    header{ margin-bottom:5px; }
+    h1{ font-size:1.5rem; }
+    .tagline{ font-size:.68rem; margin-bottom:5px; }
+    .stats{ margin-bottom:5px; }
+    #hudrow{ margin-bottom:5px; }
+    .bossbar{ margin-bottom:4px; }
+    .controls{ margin-top:8px; }
+    .guide-btn{ margin-top:10px; }
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    .tile, .tile.falling{ transition:transform .01s linear; }
+    .tile.pop{ transition:opacity .01s linear; }
+    .banner.show{ animation-duration:.4s; }
+    .tile.sp::before, .tile.wild::before{ animation:none; }
+    .tile.hint svg:first-child{ animation:none; }
+    .fx{ animation-duration:.15s !important; }
+    .stat .value.moves-low{ animation:none; }
+  }
