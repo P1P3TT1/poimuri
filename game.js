@@ -979,6 +979,7 @@ const Store = (() => {
   return {
     get: (k, d) => (k in mem ? mem[k] : d),
     set: (k, v) => { mem[k] = v; flush(); },
+    clear: () => { mem = {}; if (persistent){ try { localStorage.removeItem(KEY); } catch(e){} } },
     persistent: () => persistent
   };
 })();
@@ -999,6 +1000,19 @@ function unlockChar(id){
   unlocks[id] = true;
   Store.set("unlocks", unlocks);
   return true;
+}
+
+/* Nollaa kaiken pysyvän edistymisen: Aitan varanto, ennätys, avatut
+   hahmot, ostot ja pakatut eväät. Peruuttamaton – kutsu vain varmistuksen
+   jälkeen. */
+function resetProgress(){
+  Store.clear();
+  aitta = 0;
+  record = null;
+  unlocks = { tietaja: false, kaataja: false };
+  owned = {};
+  provisions = {};
+  selectedChar = "poimija";
 }
 
 function bankBerries(n){
@@ -2588,6 +2602,7 @@ const ENCOUNTERS = [
 const shopOverlay = document.getElementById("shopOverlay");
 const shopBody    = document.getElementById("shopBody");
 const shopBalance = document.getElementById("shopBalance");
+let resetArmed = false; // edistymisen nollauksen kaksivaiheinen varmistus
 
 function shopCard(g, state, note){
   // state: "buy" | "soldout" | "locked"
@@ -2620,6 +2635,17 @@ function renderShop(){
     return shopCard(g, state, note);
   }).join("");
   html += `</div>`;
+  // Edistymisen nollaus: pyyhkii kaiken pysyvän talletuksen
+  html += `<div class="shop-section">Nollaus</div>` +
+    `<div class="shop-reset">` +
+    `<button class="btn small${resetArmed ? " danger" : ""}" id="shopReset">` +
+    (resetArmed ? "Vahvista: pyyhi kaikki" : "Nollaa edistyminen") +
+    `</button>` +
+    `<span class="shop-reset-note">` +
+    (resetArmed
+      ? "Aitan varanto, ennätys, avatut hahmot ja ostot katoavat pysyvästi."
+      : "Aloita puhtaalta pöydältä.") +
+    `</span></div>`;
   shopBody.innerHTML = html;
   shopBody.querySelectorAll(".card:not(.disabled)").forEach(btn => {
     btn.addEventListener("click", () => {
@@ -2637,16 +2663,27 @@ function renderShop(){
         Store.set("owned", owned);
       }
       Sfx.born();
+      resetArmed = false;
       renderShop();
     });
+  });
+  document.getElementById("shopReset").addEventListener("click", () => {
+    if (!resetArmed){ resetArmed = true; renderShop(); return; }
+    resetProgress();
+    resetArmed = false;
+    Sfx.crack();
+    showBanner("Edistyminen nollattu");
+    renderShop();
   });
 }
 
 function openShop(){
+  resetArmed = false;
   renderShop();
   shopOverlay.classList.add("show");
 }
 document.getElementById("shopClose").addEventListener("click", () => {
+  resetArmed = false;
   shopOverlay.classList.remove("show");
   showMainMenu();
 });

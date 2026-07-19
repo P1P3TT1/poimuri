@@ -769,6 +769,23 @@
   }
   .card.shopitem{ grid-template-columns:44px 1fr auto; }
   .card.soldout .cprice{ color:#8fd08a; }
+  .shop-reset{
+    display:flex;
+    align-items:center;
+    gap:12px;
+    flex-wrap:wrap;
+  }
+  .shop-reset-note{
+    font-size:.78rem;
+    color:var(--cream-dim);
+    flex:1;
+    min-width:140px;
+  }
+  .btn.danger{
+    background:#7c2b23;
+    border-color:#b5443a;
+    color:#ffe4df;
+  }
   .charpower{
     font-size:.8rem;
     color:var(--cream-dim);
