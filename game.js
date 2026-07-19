@@ -104,6 +104,10 @@ const ASSETS = {
   perk_vaskooli: "🥇", perk_taky: "🧺",
   // kiroukset ja Ukonvaaja
   curse_halla: "❄️", curse_ahneus: "🪙", curse_rame: "🌫️", amulet: "⚡",
+  siru: "💠",
+  // eväskortit (varustevalinnan uusiutuvat kortit)
+  boon_lepo: "🔥", boon_kapala: "🐾", boon_kapy: "🌰",
+  boon_sakki: "🫐", boon_hionta: "⚒️",
   // minipelit
   mg_kapylintu: "🐦", mg_suohyppely: "🐸", mg_ahkio: "🛷",
   // hahmot
@@ -146,6 +150,30 @@ const CURSES = {
   rame:   { icon: ico("curse_rame"),   name: "Rämeen kutsu", desc: "Sadonkorjuu +12 muunnosta – mutta sammal leviää aina." }
 };
 const AMULET = { icon: ico("amulet"), name: "Ukonvaaja", desc: "Suojaa yhdeltä epäonnistumiselta: etappi alkaa alusta." };
+const SIRU = { icon: ico("siru"), name: "Vaajan siru", desc: "Kolmesta sirusta syntyy ⚡ Ukonvaaja." };
+
+/* Eväskortit: varustevalinnan uusiutuvat kertakortit – pooli ei ehdy,
+   vaikka kaikki varusteet olisi jo kerätty täyteen. */
+const BOON_CARDS = [
+  { id: "lepo",   icon: ico("boon_lepo"),   name: "Nuotiohetki",  desc: "Seuraava kenttä +4 siirtoa.",
+    apply: () => addNextMod({ moves: 4 }) },
+  { id: "kapala", icon: ico("boon_kapala"), name: "Käpälänjälki", desc: "Seuraava kenttä alkaa karhunkäpälä laudalla.",
+    apply: () => addNextMod({ paw: 1 }) },
+  { id: "kapy",   icon: ico("boon_kapy"),   name: "Kultakäpy",    desc: "Seuraava kenttä alkaa jokeripala laudalla.",
+    apply: () => addNextMod({ wild: 1 }) },
+  { id: "sakki",  icon: ico("boon_sakki"),  name: "Marjasäkki",   desc: "+120 🫐 matkasaaliiseen.",
+    apply: () => { RUN.berries += 120; } },
+  { id: "siru",   icon: ico("siru"),        name: "Vaajan siru",  desc: "Kolmesta sirusta syntyy ⚡ Ukonvaaja.",
+    apply: () => gainSiru() }
+];
+/* Varusteet, joita Hionta voi terästää yli maksimin (hyöty kasvaa lineaarisesti) */
+const HIONTA_OK = ["noppa", "hunaja", "kaato", "reppu", "vaskooli"];
+
+/* Kerää seuraavan kentän modifikaattorit yhteen clobberaamatta aiempia */
+function addNextMod(mod){
+  RUN.nextMod = RUN.nextMod || {};
+  for (const k in mod) RUN.nextMod[k] = (RUN.nextMod[k] || 0) + mod[k];
+}
 
 /* Polunhaarojen minipelit. Uusi minipeli = uusi merkintä tähän +
    start-funktio, joka kutsuu lopuksi onDone(portit). */
@@ -1940,6 +1968,7 @@ function renderPerks(){
   const n = Object.keys(RUN.perks).length + Object.keys(RUN.curses).length + RUN.items.length;
   invBadge.innerHTML =
     (RUN.amulets > 0 ? `⚡${RUN.amulets} ` : "") +
+    (RUN.sirut ? `💠${RUN.sirut} ` : "") +
     `🎒<span class="inv-count">${n}</span>`;
   if (invOverlay.classList.contains("show")) renderInventory();
 }
@@ -1955,6 +1984,10 @@ function renderInventory(){
   html += RUN.amulets > 0
     ? card(AMULET.icon, `${AMULET.name} ×${RUN.amulets}`, AMULET.desc)
     : card("·", "Ei Ukonvaajoja", "Pääpomot ja jotkin kohtaamiset suojaavat matkaa.");
+  if (RUN.sirut)
+    html += card(SIRU.icon, `Vaajan sirut ×${RUN.sirut}`, SIRU.desc);
+  html += card("🫐", `Matkasaalis: ${RUN.berries}`,
+    "Kohtaamiset käyvät kauppaa marjoilla. Neljännes säilyy kotiin Aittaan asti.");
   html += `</div>`;
   const perkIds = Object.keys(RUN.perks);
   if (perkIds.length){
@@ -2010,6 +2043,16 @@ function gainAmulet(n = 1){
   }
   if (gained < n) showBanner("Vaajat täynnä: +%d00 p".replace("%d", (n - gained) * 3));
   return gained;
+}
+
+/* Vaajan sirut: kolmesta kertyneestä sirusta syntyy kokonainen Ukonvaaja */
+function gainSiru(n = 1){
+  RUN.sirut = (RUN.sirut || 0) + n;
+  while (RUN.sirut >= 3){
+    RUN.sirut -= 3;
+    if (gainAmulet()) showBanner("Kolme sirua yhtyy: ⚡ Ukonvaaja!");
+  }
+  renderPerks();
 }
 
 /* Hyökkäykset: id -> { icon, teksti, toteutus performBossAttackissa } */
@@ -2090,7 +2133,7 @@ function startRun(){
   RUN = {
     act: 1, stage: 1, char: selectedChar,
     score: 0, berries: 0,
-    perks: {}, curses: {}, amulets: 0, items: [],
+    perks: {}, curses: {}, amulets: 0, sirut: 0, items: [],
     spec: null, finished: false,
     sinceEnc: 0, pendingDraft: false, lastEnc: null, nextMod: null
   };
@@ -2233,7 +2276,10 @@ function updateRunRecord(){
   return better;
 }
 
-/* Varustevalinta: kaksi varustetta + kolmas paikka (kirous/vaaja/varuste) */
+/* Varustevalinta: kaksi varustetta + kolmas paikka (kirous/vaaja/varuste).
+   Kun varustepooli ehtyy, tyhjät paikat täytetään uusiutuvilla korteilla
+   (eväskortit, ❓-esineet, Hionta, siru) – valinta ei koskaan tyhjene
+   pelkäksi pistedumpiksi eikä pakota kiroukseen. */
 function openDraft(){
   const slots = [];
   const unmaxed = () => Object.keys(PERKS).filter(id =>
@@ -2252,27 +2298,48 @@ function openDraft(){
     slots.push({ kind: "amulet" });
   else {
     const p3 = takePerk();
-    slots.push(p3 || { kind: "amulet" });
+    if (p3) slots.push(p3);
   }
-  if (!slots.length) slots.push({ kind: "amulet" });
+  // täydennys uusiutuvista korteista
+  const fillers = BOON_CARDS.map(b => ({ kind: "boon", id: b.id }));
+  if (Object.keys(MYSTERY_ITEMS).some(id => !RUN.items.includes(id)))
+    fillers.push({ kind: "item" });
+  const hCand = HIONTA_OK.filter(id => RUN.perks[id]);
+  if (hCand.length && Math.random() < 0.25)
+    fillers.push({ kind: "hionta", id: hCand[Math.floor(Math.random() * hCand.length)] });
+  if (RUN.amulets < AMULET_CAP) fillers.push({ kind: "amulet" });
+  while (slots.length < 3 && fillers.length){
+    const f = fillers.splice(Math.floor(Math.random() * fillers.length), 1)[0];
+    if (!slots.some(s => s.kind === f.kind && s.id === f.id)) slots.push(f);
+  }
+
+  const cardInfo = s =>
+    s.kind === "perk"   ? PERKS[s.id]
+  : s.kind === "curse"  ? CURSES[s.id]
+  : s.kind === "amulet" ? AMULET
+  : s.kind === "boon"   ? BOON_CARDS.find(b => b.id === s.id)
+  : s.kind === "item"   ? { icon: "❓", name: "Tuntematon esine",
+                            desc: "Vaikutus paljastuu, kun sen hetki koittaa." }
+  : /* hionta */          { icon: ico("boon_hionta"), name: "Hionta: " + PERKS[s.id].name,
+                            desc: `Terästä varuste yli äärirajan: +1 taso (omistat ×${RUN.perks[s.id]}).` };
 
   draftCards.innerHTML = trailHTML() + slots.map((s, i) => {
-    const item = s.kind === "perk" ? PERKS[s.id]
-               : s.kind === "curse" ? CURSES[s.id]
-               : AMULET;
+    const item = cardInfo(s);
     const owned = s.kind === "perk" && RUN.perks[s.id] ? ` (omistat ×${RUN.perks[s.id]})` : "";
-    const name = item.name;
     const cls = s.kind === "curse" ? " curse" : s.kind === "amulet" ? " amu" : "";
     return `<button class="card${cls}" data-i="${i}">` +
       `<span class="cicon">${item.icon}</span>` +
-      `<span class="cname">${name}${owned}</span>` +
+      `<span class="cname">${item.name}${owned}</span>` +
       `<span class="cdesc">${item.desc}</span></button>`;
   }).join("");
   draftCards.querySelectorAll(".card").forEach(btn => {
     btn.addEventListener("click", () => {
       const s = slots[+btn.dataset.i];
-      if (s.kind === "perk")       RUN.perks[s.id] = (RUN.perks[s.id] || 0) + 1;
+      if (s.kind === "perk" || s.kind === "hionta")
+                                   RUN.perks[s.id] = (RUN.perks[s.id] || 0) + 1;
       else if (s.kind === "curse") RUN.curses[s.id] = true;
+      else if (s.kind === "boon")  BOON_CARDS.find(b => b.id === s.id).apply();
+      else if (s.kind === "item")  giveMysteryItem();
       else                         gainAmulet();
       Sfx.born();
       draftOverlay.classList.remove("show");
@@ -2324,14 +2391,17 @@ const ENCOUNTERS = [
     choices: [
       { label: "Maista", desc: "Uhkapeli: herkku tai kosto",
         act(){
-          if (Math.random() < 0.5){ RUN.score += 600; return "Maku on taivaallinen! <b>+600 p</b>"; }
+          if (Math.random() < 0.5){
+            gainSiru(); RUN.berries += 100;
+            return "Maku on taivaallinen! <b>💠 Vaajan siru</b> ja <b>+100 🫐</b>";
+          }
           const c = randomFreeCurse();
           if (c){ RUN.curses[c] = true; return `Vatsa vääntyy... <b>${CURSES[c].name}</b> tarttuu matkaan!`; }
-          RUN.score = Math.max(0, RUN.score - 300);
-          return "Vatsa vääntyy pahasti. <b>−300 p</b>";
+          addNextMod({ moves: -2 });
+          return "Vatsa vääntyy pahasti. Seuraava kenttä <b>−2 siirtoa</b>.";
         } },
-      { label: "Vuole näyte", desc: "Turvallinen tutkimus: +250 p", requires: "puukko",
-        act(){ RUN.score += 250; return "Puukko viipaloi siistin näytteen talteen. <b>+250 p</b>"; } },
+      { label: "Vuole näyte", desc: "Turvallinen tutkimus: +150 🫐", requires: "puukko",
+        act(){ RUN.berries += 150; return "Puukko viipaloi siistin näytteen talteen. <b>+150 🫐</b>"; } },
       { label: "Jatka matkaa", desc: "Ei riskejä",
         act(){ return "Annat sienen hohtaa rauhassa."; } }
     ] },
@@ -2348,13 +2418,13 @@ const ENCOUNTERS = [
           return `Eukko vie <b>${PERKS[id].name}</b> ja ojentaa <b>${g} ⚡ Ukonvaajaa</b>` +
             (g < 2 ? " (loput painuvat pisteiksi)" : "") + ".";
         } },
-      { label: "Osta mytty", desc: "400 p → tuntematon esine", minScore: 400,
+      { label: "Osta mytty", desc: "250 🫐 → tuntematon esine", minBerries: 250,
         act(){
-          RUN.score -= 400;
+          RUN.berries -= 250;
           const it = giveMysteryItem();
           if (it) return "Saat kankaisen mytyn. <b>❓ Tuntematon esine</b>";
-          RUN.score += 400;
-          return "Eukon kori onkin tyhjä – saat rahat takaisin.";
+          RUN.berries += 250;
+          return "Eukon kori onkin tyhjä – saat marjasi takaisin.";
         } },
       { label: "Kiitä ja jatka", desc: "",
         act(){ return "Eukko hymyilee hampaattomasti ja jatkaa poimimista."; } }
@@ -2369,9 +2439,9 @@ const ENCOUNTERS = [
           gainAmulet();
           return "Vuolet ukonvaajan muotoisen taikakalun. <b>+1 ⚡</b>";
         } },
-      { label: "Kiipeä yli", desc: "+300 p, mutta seuraava kenttä −2 siirtoa",
-        act(){ RUN.nextMod = { moves: -2 }; RUN.score += 300;
-          return "Rungon päältä poimit unohtuneen korin. <b>+300 p</b> – mutta voimat hupenevat."; } },
+      { label: "Kiipeä yli", desc: "+150 🫐, mutta seuraava kenttä −2 siirtoa",
+        act(){ addNextMod({ moves: -2 }); RUN.berries += 150;
+          return "Rungon päältä poimit unohtuneen korin. <b>+150 🫐</b> – mutta voimat hupenevat."; } },
       { label: "Kierrä", desc: "Hidas mutta varma",
         act(){ return "Kierrät kelon kaikessa rauhassa."; } }
     ] },
@@ -2389,7 +2459,7 @@ const ENCOUNTERS = [
       { label: "Loiki yli", desc: "Suohyppely: rivit palkitsevat",
         act(){ return { minigame: "suohyppely" }; } },
       { label: "Kierrä pitkää reittiä", desc: "Uuvuttavaa: seuraava kenttä −1 siirto",
-        act(){ RUN.nextMod = { moves: -1 };
+        act(){ addNextMod({ moves: -1 });
           return "Kierto vie voimia, mutta kuivin jaloin pääset. <b>−1 siirto</b> seuraavaan."; } }
     ] },
   { id: "rinne", act: 3, icon: ico("ev_rinne"), title: "Jyrkkä tunturinrinne",
@@ -2411,7 +2481,7 @@ const ENCOUNTERS = [
             delete RUN.curses[id];
             return `Vesi huuhtoo pahan pois: <b>${CURSES[id].name}</b> hälvenee!`;
           }
-          RUN.nextMod = { moves: 4 };
+          addNextMod({ moves: 4 });
           return "Olo kevenee: seuraava kenttä <b>+4 siirtoa</b>.";
         } },
       { label: "Jatka matkaa", desc: "",
@@ -2424,23 +2494,26 @@ const ENCOUNTERS = [
         act(){
           const it = giveMysteryItem();
           if (it) return "Nurkassa lojuu jotain kankaaseen käärittynä. <b>❓ Tuntematon esine</b>";
-          RUN.score += 250;
-          return "Vain vanhoja tuohia – ja niiden alla kolikoita. <b>+250 p</b>";
+          gainSiru();
+          return "Vain vanhoja tuohia – ja niiden alta kimaltaa. <b>💠 Vaajan siru</b>";
         } },
       { label: "Lepää portailla", desc: "Seuraava kenttä +3 siirtoa",
-        act(){ RUN.nextMod = { moves: 3 }; return "Hetken lepo tekee terää. <b>+3 siirtoa</b> seuraavaan."; } }
+        act(){ addNextMod({ moves: 3 }); return "Hetken lepo tekee terää. <b>+3 siirtoa</b> seuraavaan."; } }
     ] },
   { id: "pesa", icon: ico("ev_pesa"), title: "Muurahaispesä",
     text: "Polun vieressä kohoaa komea keko. Sen kupeessa kimaltaa jotain.",
     choices: [
       { label: "Kaiva rohkeasti", desc: "Kimallus tai kirvelevä erehdys",
         act(){
-          if (Math.random() < 0.45){ RUN.score += 400; return "Kekoon on hautautunut hopealusikka! <b>+400 p</b>"; }
-          RUN.nextMod = { moves: -2 };
+          if (Math.random() < 0.45){
+            gainSiru();
+            return "Kekoon on hautautunut ukonvaajan siru! <b>💠 Vaajan siru</b>";
+          }
+          addNextMod({ moves: -2 });
           return "Muurahaiset puolustavat kotiaan kiivaasti. Seuraava kenttä <b>−2 siirtoa</b>.";
         } },
-      { label: "Kaiva virsuilla", desc: "Tuohivirsut suojaavat: +400 p", requires: "virsut",
-        act(){ RUN.score += 400; return "Virsut pitävät puremat loitolla. <b>+400 p</b>"; } },
+      { label: "Kaiva virsuilla", desc: "Tuohivirsut suojaavat: 💠 siru", requires: "virsut",
+        act(){ gainSiru(); return "Virsut pitävät puremat loitolla. <b>💠 Vaajan siru</b>"; } },
       { label: "Kunnioita kekoa", desc: "",
         act(){ return "Metsä muistaa hyvän tavan."; } }
     ] },
@@ -2452,11 +2525,11 @@ const ENCOUNTERS = [
           if (Math.random() < 0.55){
             const it = giveMysteryItem();
             if (it) return "Sormet osuvat johonkin kääröön. <b>❓ Tuntematon esine</b>";
-            RUN.score += 250;
-            return "Pohjalla kimaltaa kolikoita. <b>+250 p</b>";
+            gainSiru();
+            return "Pohjalla kimaltaa ukonvaajan siru. <b>💠 Vaajan siru</b>";
           }
-          RUN.score = Math.max(0, RUN.score - 150);
-          return "Kurottaessasi taskusta kirpoaa kolikoita kuoppaan. <b>−150 p</b>";
+          RUN.berries = Math.max(0, RUN.berries - 100);
+          return "Kurottaessasi korista kirpoaa marjoja kuoppaan. <b>−100 🫐</b>";
         } },
       { label: "Jatka matkaa", desc: "",
         act(){ return "Hiiden kirnut saavat pitää salaisuutensa."; } }
@@ -2464,9 +2537,9 @@ const ENCOUNTERS = [
   { id: "noita", icon: ico("ev_noita"), title: "Vanha noita",
     text: "Kelohonkien katveessa istuu noita, joka lukee lintujen lentoa. \"Vaivasi näkyy kauas, kulkija.\"",
     choices: [
-      { label: "Maksa puhdistus", desc: "300 p: poistaa kirouksen – tai loitsii suojan", minScore: 300,
+      { label: "Maksa puhdistus", desc: "200 🫐: poistaa kirouksen – tai loitsii suojan", minBerries: 200,
         act(){
-          RUN.score -= 300;
+          RUN.berries -= 200;
           const ids = Object.keys(RUN.curses);
           if (ids.length){
             const id = ids[Math.floor(Math.random() * ids.length)];
@@ -2489,10 +2562,10 @@ const ENCOUNTERS = [
               RUN.perks.kaato = (RUN.perks.kaato || 0) + 1;
               return "Karhu nukkuu syvässä unessa – opit sen mahdin. <b>🐻 Karhunkaato</b>!";
             }
-            RUN.score += 400;
-            return "Pesän suulta löytyy hunajainen kätkö. <b>+400 p</b>";
+            RUN.berries += 200;
+            return "Pesän suulta löytyy hunajainen kätkö. <b>+200 🫐</b>";
           }
-          RUN.nextMod = { moves: -3 };
+          addNextMod({ moves: -3 });
           return "Karhu murahtaa unissaan – pakenet henkesi edestä. Seuraava kenttä <b>−3 siirtoa</b>.";
         } },
       { label: "Hiivi ohi", desc: "",
@@ -2502,9 +2575,9 @@ const ENCOUNTERS = [
     text: "Kivien ympäröimä nuotiopaikka. Tuhka on vielä lämmintä – joku on kulkenut edelläsi.",
     choices: [
       { label: "Sytytä ja lepää", desc: "Seuraava kenttä +4 siirtoa",
-        act(){ RUN.nextMod = { moves: 4 }; return "Liekit lämmittävät luihin asti. <b>+4 siirtoa</b> seuraavaan."; } },
-      { label: "Penko tuhkat", desc: "Reppu tuntee kätköt: +300 p", requires: "reppu",
-        act(){ RUN.score += 300; return "Repun sivutaskusta löytyy tuhkakätköjen kartta. <b>+300 p</b>"; } }
+        act(){ addNextMod({ moves: 4 }); return "Liekit lämmittävät luihin asti. <b>+4 siirtoa</b> seuraavaan."; } },
+      { label: "Penko tuhkat", desc: "Reppu tuntee kätköt: +150 🫐", requires: "reppu",
+        act(){ RUN.berries += 150; return "Repun sivutaskusta löytyy tuhkakätköjen kartta. <b>+150 🫐</b>"; } }
     ] }
 ];
 
@@ -2622,6 +2695,7 @@ function openEncounter(forced){
   const enc = forced || pool[Math.floor(Math.random() * pool.length)];
   RUN.lastEnc = enc.id;
   encBody.innerHTML = trailHTML() +
+    `<div class="trail-label">Korissa: <b>${RUN.berries}</b> 🫐</div>` +
     `<div class="enc-head">${enc.icon}</div>` +
     `<h2>${enc.title}</h2>` +
     `<p class="enc-text">${enc.text}</p>` +
@@ -2634,6 +2708,8 @@ function openEncounter(forced){
         locked = "Vaatii: vähintään yksi varuste";
       else if (ch.minScore && RUN.score + score < ch.minScore)
         locked = `Vaatii: ${ch.minScore} p`;
+      else if (ch.minBerries && RUN.berries < ch.minBerries)
+        locked = `Vaatii: ${ch.minBerries} 🫐`;
       return `<button class="card${locked ? " disabled" : ""}" data-i="${i}" ${locked ? "disabled" : ""}>` +
         `<span class="cicon">${enc.icon}</span>` +
         `<span class="cname">${ch.label}</span>` +
@@ -3292,8 +3368,10 @@ function newGame(){
   ICONS = ICON_SETS[Math.min(3, RUN.act) - 1];
   document.body.className = RUN.act >= 2 ? "act-" + Math.min(3, RUN.act) : "";
   pyryCounter = 3;
+  let NM = null; // kohtaamisten ja eväskorttien kenttämodifikaattorit
   {
     const S = RUN.spec;
+    moves = S.moves + 2 * perkCount("noppa") + (curseOn("halla") ? 3 : 0);
     if (S.battle){
       BATTLE = {
         hp: S.hp, maxHp: S.hp,
@@ -3332,12 +3410,10 @@ function newGame(){
         moves += 3;
       }
     }
-    // kohtaamisten kenttämodifikaattorit (lepo, väsymys...)
-    if (RUN.nextMod){
-      moves = Math.max(6, moves + (RUN.nextMod.moves || 0));
-      RUN.nextMod = null;
-    }
-    moves = S.moves + 2 * perkCount("noppa") + (curseOn("halla") ? 3 : 0);
+    // kohtaamisten ja eväskorttien kenttämodifikaattorit (lepo, väsymys...)
+    NM = RUN.nextMod;
+    RUN.nextMod = null;
+    if (NM && NM.moves) moves = Math.max(6, moves + NM.moves);
     collectGoals = {};
     for (const t in (S.collect || {}))
       collectGoals[t] = Math.round(S.collect[t] * (curseOn("ahneus") ? 1.25 : 1));
@@ -3368,8 +3444,9 @@ function newGame(){
     }
   } while (!hasValidMove(types, specials, ices) && guard++ < 100);
 
-  // Vaellus: Karhunkaato asettaa käpälän/käpälät valmiiksi
-  for (let i = 0; i < perkCount("kaato"); i++){
+  // Vaellus: Karhunkaato ja Käpälänjälki-eväskortti asettavat käpälät valmiiksi
+  const paws = perkCount("kaato") + (NM && NM.paw ? NM.paw : 0);
+  for (let i = 0; i < paws; i++){
     const cand = [];
     for (let r = 0; r < ROWS; r++)
       for (let c = 0; c < COLS; c++)
@@ -3377,6 +3454,17 @@ function newGame(){
     if (cand.length){
       const p = cand[Math.floor(Math.random() * cand.length)];
       specials[p.r][p.c] = S_BOMB;
+    }
+  }
+  // Kultakäpy-eväskortti: jokeripala valmiiksi laudalle
+  if (NM && NM.wild){
+    const cand = [];
+    for (let r = 0; r < ROWS; r++)
+      for (let c = 0; c < COLS; c++)
+        if (types[r][c] >= 0 && specials[r][c] === S_NONE && !ices[r][c]) cand.push({ r, c });
+    for (let i = 0; i < NM.wild && cand.length; i++){
+      const p = cand.splice(Math.floor(Math.random() * cand.length), 1)[0];
+      types[p.r][p.c] = T_WILD;
     }
   }
 
