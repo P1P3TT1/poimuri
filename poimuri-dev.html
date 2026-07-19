@@ -1,0 +1,4825 @@
+<!DOCTYPE html>
+<html lang="fi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>[DEV] POIMURI – marjametsän match 3</title>
+<style>
+  :root{
+    --bg-deep:#15241b;
+    --bg-moss:#1d2f23;
+    --board:#243a2b;
+    --cell:#2c4634;
+    --cell-alt:#2a4231;
+    --cream:#f2edde;
+    --cream-dim:#c9c4b0;
+    --gold:#e5b954;
+    --berry-red:#c8443c;
+    --blue:#6b7fc4;
+    --shadow:rgba(0,0,0,.45);
+  }
+
+  *{ margin:0; padding:0; box-sizing:border-box; }
+
+  html,body{ height:100%; }
+
+  body{
+    font-family:"Manrope","Segoe UI",system-ui,sans-serif;
+    background:
+      radial-gradient(1200px 700px at 50% -10%, #27402e 0%, transparent 60%),
+      var(--bg-deep);
+    color:var(--cream);
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    min-height:100%;
+    padding:18px 12px 28px;
+    -webkit-tap-highlight-color:transparent;
+    touch-action:manipulation;
+    overflow-x:hidden;
+  }
+
+  /* ---------- Header ---------- */
+  header{ text-align:center; margin-bottom:8px; user-select:none; }
+
+  h1{
+    font-family:Georgia,"Times New Roman",serif;
+    font-weight:700;
+    font-size:clamp(2rem, 7vw, 2.9rem);
+    letter-spacing:.22em;
+    color:var(--gold);
+    text-shadow:0 2px 0 rgba(0,0,0,.35);
+  }
+  h1 .leaf{ color:#7fae6f; font-size:.6em; vertical-align:.35em; letter-spacing:0; }
+
+  .tagline{
+    margin-top:2px;
+    font-size:.85rem;
+    color:var(--cream-dim);
+    letter-spacing:.06em;
+  }
+
+  /* ---------- Stats ---------- */
+  .stats{
+    display:flex;
+    gap:10px;
+    margin-bottom:6px;
+    width:min(92vw, 460px);
+    position:sticky;
+    top:6px;
+    z-index:9;
+  }
+  .stats .stat{
+    background:rgba(26,44,32,.94);
+    backdrop-filter:blur(4px);
+    box-shadow:0 3px 10px rgba(0,0,0,.35);
+  }
+  .stat.inv{
+    flex:none;
+    font:inherit;
+    color:var(--cream);
+    cursor:pointer;
+    padding:8px 10px 9px;
+    border:1px solid #35543e;
+    min-width:58px;
+  }
+  .stat.inv .value{ font-size:.95rem; letter-spacing:.02em; white-space:nowrap; }
+  .stat.inv.hidden{ display:none; }
+  .inv-count{
+    font-size:.7rem;
+    color:var(--cream-dim);
+  }
+  .stat{
+    flex:1;
+    position:relative;
+    background:var(--bg-moss);
+    border:1px solid #35543e;
+    border-radius:12px;
+    padding:8px 6px 9px;
+    text-align:center;
+    box-shadow:0 3px 8px var(--shadow);
+  }
+  .stat .label{
+    font-size:.66rem;
+    text-transform:uppercase;
+    letter-spacing:.14em;
+    color:var(--cream-dim);
+  }
+  .stat .value{
+    font-size:1.35rem;
+    font-weight:800;
+    font-variant-numeric:tabular-nums;
+    margin-top:1px;
+  }
+  .stat .value.moves-low{ color:var(--berry-red); animation:lowPulse 1s ease-in-out infinite; }
+  @keyframes lowPulse{ 50%{ opacity:.55; } }
+
+  .dmgfloat{
+    position:absolute;
+    right:8px; top:4px;
+    font-size:.8rem;
+    font-weight:800;
+    color:#8fd08a;
+    pointer-events:none;
+    animation:plusFloat .9s ease-out forwards;
+  }
+  @keyframes plusFloat{
+    0%{ opacity:0; transform:translateY(6px); }
+    20%{ opacity:1; }
+    100%{ opacity:0; transform:translateY(-14px); }
+  }
+
+  /* ---------- Taival: tasot ja tavoitteet ---------- */
+
+  #hudrow{
+    flex:none;
+    display:flex;
+    flex-wrap:nowrap;
+    align-items:center;
+    gap:10px;
+    width:fit-content;
+    max-width:min(92vw, 460px);
+    margin:0 auto 8px;
+    overflow-x:auto;
+    scrollbar-width:none;
+    -webkit-overflow-scrolling:touch;
+    padding-bottom:2px;
+  }
+  #hudrow::-webkit-scrollbar{ display:none; }
+  #hudrow:not(:has(> :not(.hidden))){ display:none; }
+  .goals{
+    flex:none;
+    display:flex;
+    flex-wrap:nowrap;
+    gap:8px;
+  }
+  .goals .chip{ flex:none; }
+  .goals.perks .chip{
+    font:inherit;
+    font-size:.9rem;
+    cursor:pointer;
+    padding:4px 8px;
+  }
+  .goals.perks .chip b{
+    font-size:.68rem;
+    color:var(--cream-dim);
+    margin-left:2px;
+  }
+  .goals.hidden{ display:none; }
+  .goals .chip{
+    display:flex;
+    align-items:center;
+    gap:4px;
+    background:var(--bg-moss);
+    border:1px solid #35543e;
+    border-radius:999px;
+    padding:4px 12px 4px 6px;
+    font-weight:800;
+    font-size:.9rem;
+    font-variant-numeric:tabular-nums;
+  }
+  .goals .chip.done{ border-color:var(--gold); color:var(--gold); }
+  .goals .ci{ width:22px; height:22px; display:inline-block; }
+  .goals .ci svg{ width:100%; height:100%; display:block; }
+
+  .mosscell{
+    position:absolute;
+    border-radius:10px;
+    z-index:1;
+    pointer-events:none;
+    background:
+      radial-gradient(circle at 30% 30%, #5c8046 0 22%, transparent 23%),
+      radial-gradient(circle at 72% 38%, #69904f 0 18%, transparent 19%),
+      radial-gradient(circle at 45% 72%, #557a41 0 24%, transparent 25%),
+      #4a6b3a;
+    box-shadow:inset 0 0 0 2px rgba(30,45,25,.55);
+  }
+  .mosscell.m2{ filter:brightness(.72) saturate(1.15); box-shadow:inset 0 0 0 3px rgba(18,30,14,.75); }
+  .mosscell.grow{ animation:mossGrow .5s ease; }
+  @keyframes mossGrow{ from{ transform:scale(.2); opacity:0; } }
+
+  .tile .ice{
+    position:absolute;
+    inset:5%;
+    border-radius:10px;
+    z-index:2;
+    pointer-events:none;
+    background:linear-gradient(135deg, rgba(212,236,255,.5), rgba(140,190,230,.3) 55%, rgba(224,242,255,.5));
+    border:2px solid rgba(222,242,255,.7);
+    box-shadow:inset 0 0 8px rgba(255,255,255,.45);
+  }
+  .tile .ice::after{
+    content:"❄";
+    position:absolute;
+    right:7%; top:1%;
+    font-size:.85rem;
+    color:rgba(242,250,255,.9);
+    text-shadow:0 1px 2px rgba(40,80,120,.5);
+  }
+  .tile.deny svg:first-child{ animation:denyShake .3s ease; }
+  @keyframes denyShake{
+    0%,100%{ transform:translateX(0); }
+    25%{ transform:translateX(-9%); }
+    60%{ transform:translateX(8%); }
+  }
+
+  /* ---------- Board ---------- */
+  .board-wrap{ position:relative; width:min(92vw, 460px); }
+
+  .board{
+    position:relative;
+    width:100%;
+    aspect-ratio:1/1;
+    background:var(--board);
+    border:1px solid #3a5a44;
+    border-radius:16px;
+    box-shadow:0 10px 30px var(--shadow), inset 0 0 0 6px rgba(0,0,0,.12);
+    overflow:hidden;
+    touch-action:none;
+  }
+
+  .cellbg{
+    position:absolute;
+    border-radius:10px;
+    background:var(--cell);
+  }
+  .cellbg.alt{ background:var(--cell-alt); }
+
+  .tile{
+    position:absolute;
+    left:0; top:0;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    cursor:pointer;
+    will-change:transform;
+    transition:transform .22s cubic-bezier(.3,.9,.4,1.1);
+    z-index:2;
+  }
+  .tile svg{
+    width:78%; height:78%;
+    filter:drop-shadow(0 2px 2px rgba(0,0,0,.35));
+    pointer-events:none;
+  }
+  .tile.selected{ z-index:3; }
+  .tile.selected svg:first-child{
+    transform:scale(1.14);
+    filter:drop-shadow(0 0 8px rgba(229,185,84,.9)) drop-shadow(0 2px 3px rgba(0,0,0,.4));
+  }
+  .tile.falling{ transition:transform .3s cubic-bezier(.35,.1,.55,1.25); }
+  .tile.pop{
+    transition:transform .22s ease-in, opacity .22s ease-in;
+    transform:scale(0) !important;
+    opacity:0;
+  }
+  .no-anim .tile{ transition:none !important; }
+
+  /* ---------- Erikoispalat ---------- */
+  .tile.sp::before{
+    content:"";
+    position:absolute;
+    inset:14%;
+    border-radius:50%;
+    box-shadow:0 0 10px 4px rgba(229,185,84,.4);
+    animation:spPulse 1.5s ease-in-out infinite;
+  }
+  @keyframes spPulse{
+    50%{ box-shadow:0 0 16px 7px rgba(229,185,84,.65); }
+  }
+  .tile.wild::before{
+    box-shadow:0 0 14px 6px rgba(255,232,160,.6);
+    animation:wildPulse 2.4s linear infinite;
+  }
+  @keyframes wildPulse{
+    0%,100%{ filter:hue-rotate(0deg); box-shadow:0 0 14px 6px rgba(255,232,160,.6); }
+    50%{ filter:hue-rotate(45deg); box-shadow:0 0 20px 9px rgba(255,232,160,.8); }
+  }
+  .tile svg.badge{
+    position:absolute;
+    width:42%; height:42%;
+    right:1%; bottom:1%;
+    filter:drop-shadow(0 1px 2px rgba(0,0,0,.55));
+  }
+  .tile.born svg:first-child{ animation:bornPop .4s ease; }
+  @keyframes bornPop{
+    0%{ transform:scale(.2) rotate(-20deg); }
+    65%{ transform:scale(1.25) rotate(6deg); }
+    100%{ transform:scale(1) rotate(0); }
+  }
+
+  /* ---------- Vihje ---------- */
+  .tile.hint{ z-index:3; }
+  .tile.hint svg:first-child{
+    animation:hintWiggle 1.6s ease;
+    filter:drop-shadow(0 0 7px rgba(242,237,222,.75)) drop-shadow(0 2px 2px rgba(0,0,0,.35));
+  }
+  @keyframes hintWiggle{
+    0%,100%{ transform:scale(1); }
+    15%,45%,75%{ transform:scale(1.18); }
+    30%,60%{ transform:scale(.94); }
+  }
+
+  /* ---------- Tehosteet ---------- */
+  .fx{ position:absolute; pointer-events:none; z-index:5; }
+  .fx.beam-h{
+    left:0; width:100%;
+    background:linear-gradient(90deg, transparent, rgba(229,185,84,.9) 30%, rgba(229,185,84,.9) 70%, transparent);
+    border-radius:8px;
+    animation:fxFade .55s ease-out forwards;
+  }
+  .fx.beam-v{
+    top:0; height:100%;
+    background:linear-gradient(180deg, transparent, rgba(229,185,84,.9) 30%, rgba(229,185,84,.9) 70%, transparent);
+    border-radius:8px;
+    animation:fxFade .55s ease-out forwards;
+  }
+  .fx.boom{
+    border-radius:50%;
+    background:radial-gradient(circle, rgba(255,225,150,.95), rgba(200,68,60,.4) 55%, transparent 72%);
+    animation:fxBoom .55s ease-out forwards;
+  }
+  .fx.flash{
+    inset:0;
+    background:radial-gradient(circle, rgba(255,235,170,.55), transparent 70%);
+    animation:fxFade .65s ease-out forwards;
+  }
+  @keyframes fxFade{ from{ opacity:1; } to{ opacity:0; } }
+  @keyframes fxBoom{
+    0%{ transform:scale(.25); opacity:1; }
+    100%{ transform:scale(1.15); opacity:0; }
+  }
+
+  .sel-ring{
+    position:absolute;
+    border:3px solid var(--gold);
+    border-radius:12px;
+    pointer-events:none;
+    z-index:4;
+    box-shadow:0 0 12px rgba(229,185,84,.5);
+    display:none;
+  }
+  .cursor-ring{
+    position:absolute;
+    border:2px dashed rgba(242,237,222,.75);
+    border-radius:12px;
+    pointer-events:none;
+    z-index:4;
+    display:none;
+  }
+  .board.kb .cursor-ring{ display:block; }
+
+  /* ---------- Chain banner ---------- */
+  .banner{
+    position:absolute;
+    left:50%; top:42%;
+    transform:translate(-50%,-50%) scale(.6);
+    font-family:Georgia,serif;
+    font-weight:700;
+    font-size:clamp(1.4rem, 6vw, 2.2rem);
+    color:var(--gold);
+    text-shadow:0 2px 0 rgba(0,0,0,.5), 0 0 18px rgba(229,185,84,.45);
+    opacity:0;
+    pointer-events:none;
+    z-index:6;
+    white-space:nowrap;
+  }
+  .banner.show{ animation:bannerPop 1s ease forwards; }
+  @keyframes bannerPop{
+    0%{ opacity:0; transform:translate(-50%,-50%) scale(.6); }
+    18%{ opacity:1; transform:translate(-50%,-50%) scale(1.05); }
+    70%{ opacity:1; transform:translate(-50%,-58%) scale(1); }
+    100%{ opacity:0; transform:translate(-50%,-70%) scale(1); }
+  }
+
+  /* ---------- Overlay ---------- */
+  .overlay{
+    position:absolute;
+    inset:0;
+    background:rgba(13,22,16,.88);
+    backdrop-filter:blur(3px);
+    border-radius:16px;
+  }
+  /* päävalikko irtoaa laudasta koko ruudun kokoiseksi */
+  .overlay.menu{
+    position:fixed;
+    border-radius:0;
+    justify-content:flex-start;
+    overflow-y:auto;
+    padding:max(24px, env(safe-area-inset-top)) 16px
+            max(24px, env(safe-area-inset-bottom));
+  }
+  .overlay.menu #ovTitle{ margin-top:4vh; }
+  .overlay-dummy{ display:none; }
+  .overlay{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    text-align:center;
+    gap:10px;
+    z-index:10;
+    opacity:0;
+    pointer-events:none;
+    transition:opacity .35s ease;
+    padding:20px;
+  }
+  .overlay.show{ opacity:1; pointer-events:auto; }
+  .overlay h2{
+    font-family:Georgia,serif;
+    font-size:1.9rem;
+    color:var(--gold);
+    letter-spacing:.04em;
+  }
+  .overlay .final{ font-size:1.05rem; line-height:1.7; color:var(--cream); }
+  .overlay .final b{ font-variant-numeric:tabular-nums; }
+  .overlay .record{ color:#8fd08a; font-weight:700; }
+  .overlay .ovstars{
+    font-size:2rem;
+    letter-spacing:.18em;
+    display:inline-block;
+  }
+  .overlay .ovstars span{ color:#54604d; }
+  .overlay .ovstars span.on{ color:var(--gold); text-shadow:0 0 14px rgba(229,185,84,.55); }
+
+  /* ---------- Buttons & footer ---------- */
+  button.btn{
+    font:inherit;
+    font-weight:800;
+    letter-spacing:.05em;
+    background:var(--gold);
+    color:#3a2c10;
+    border:none;
+    border-radius:999px;
+    padding:11px 26px;
+    cursor:pointer;
+    box-shadow:0 4px 0 #a37f2c, 0 6px 14px var(--shadow);
+    transition:transform .08s ease, box-shadow .08s ease;
+  }
+  button.btn:active{ transform:translateY(3px); box-shadow:0 1px 0 #a37f2c; }
+  button.btn:focus-visible{ outline:3px solid var(--cream); outline-offset:3px; }
+
+  .controls{
+    margin-top:14px;
+    display:flex;
+    flex-wrap:wrap;
+    justify-content:center;
+    align-items:center;
+    gap:10px;
+  }
+  .controls .btn.small{ padding:8px 20px; font-size:.9rem; }
+  .controls .btn.iconbtn{
+    padding:8px 0;
+    width:44px;
+    font-size:1.05rem;
+    border-radius:50%;
+    line-height:1;
+    transition:opacity .15s ease;
+  }
+  .controls .btn.iconbtn[aria-pressed="false"]{ opacity:.5; }
+
+  /* ---------- Poimijan opas: puinen viitta ja opastaulu ---------- */
+  .guide-btn{
+    margin-top:20px;
+    position:relative;
+    flex:none;
+    width:132px;
+    min-width:132px;
+    height:96px;
+    min-height:96px;
+    border:none;
+    background:transparent;
+    cursor:pointer;
+    padding:0;
+    transform:rotate(-1.4deg);
+    transition:transform .16s ease;
+    filter:drop-shadow(0 7px 12px var(--shadow));
+  }
+  .guide-btn:hover{ transform:rotate(0deg) scale(1.04); }
+  .guide-btn:focus-visible{ outline:3px solid var(--cream); outline-offset:5px; border-radius:5px; }
+  /* kirjan selkämys vasemmassa reunassa */
+  .guide-btn .book-spine{
+    position:absolute;
+    left:0; top:0; bottom:0;
+    width:15px;
+    border-radius:6px 3px 3px 6px;
+    background:linear-gradient(90deg, #3a2413, #57351c 55%, #4a2c17);
+    box-shadow:inset -2px 0 3px rgba(0,0,0,.5), inset 1px 0 0 rgba(255,220,170,.15);
+  }
+  /* sivunipun reunat selkämyksen takana */
+  .guide-btn .book-spine::after{
+    content:"";
+    position:absolute;
+    right:-4px; top:5px; bottom:5px;
+    width:5px;
+    border-radius:0 2px 2px 0;
+    background:repeating-linear-gradient(180deg, #efe4c8 0 2px, #cdbf9c 2px 4px);
+  }
+  /* nahkakansi */
+  .guide-btn .book-face{
+    position:absolute;
+    left:11px; right:0; top:0; bottom:0;
+    border-radius:3px 8px 8px 3px;
+    background:
+      repeating-linear-gradient(48deg, rgba(0,0,0,.05) 0 3px, transparent 3px 8px),
+      linear-gradient(150deg, #7c5233, #5f3d24 60%, #4f3320);
+    border:1px solid #3a2413;
+    box-shadow:inset 0 1px 0 rgba(255,225,180,.2), inset 0 -6px 14px rgba(0,0,0,.35);
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:2px;
+    font-family:Georgia,serif;
+    font-weight:700;
+    font-size:.98rem;
+    line-height:1.15;
+    letter-spacing:.05em;
+    color:#f1e2c4;
+    text-shadow:0 -1px 0 rgba(0,0,0,.5), 0 1px 0 rgba(255,230,190,.12);
+  }
+  /* kohokultauskehys */
+  .guide-btn .book-band{
+    position:absolute;
+    inset:7px 9px;
+    border:1.5px solid rgba(216,178,110,.55);
+    border-radius:2px 5px 5px 2px;
+    pointer-events:none;
+  }
+  .guide-btn .book-leaf{
+    color:#c9a45a;
+    font-size:1.05rem;
+    margin-top:3px;
+  }
+
+  .guide-overlay{
+    position:fixed;
+    inset:0;
+    background:rgba(10,18,13,.78);
+    backdrop-filter:blur(3px);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:16px;
+    z-index:100;
+    opacity:0;
+    pointer-events:none;
+    transition:opacity .25s ease;
+  }
+  .guide-overlay.show{ opacity:1; pointer-events:auto; }
+
+  .guide{
+    width:min(560px, 100%);
+    max-height:88vh;
+    overflow-y:auto;
+    background:
+      repeating-linear-gradient(88deg, rgba(0,0,0,.07) 0 2px, transparent 2px 11px),
+      linear-gradient(180deg, #7d5838, #66452a 60%, #573a22);
+    border:4px solid #462e15;
+    border-radius:14px;
+    box-shadow:0 18px 50px rgba(0,0,0,.6);
+    padding:14px;
+  }
+
+  .guide-paper{
+    background:linear-gradient(180deg, #f4efe0, #ece5d0);
+    border-radius:8px;
+    padding:20px 20px 22px;
+    color:#33402f;
+    position:relative;
+    box-shadow:inset 0 0 16px rgba(90,70,40,.22), 0 2px 6px rgba(0,0,0,.35);
+  }
+  /* punaiset nastat paperin kulmissa */
+  .guide-paper::before, .guide-paper::after{
+    content:"";
+    position:absolute;
+    top:9px;
+    width:14px; height:14px;
+    border-radius:50%;
+    background:radial-gradient(circle at 35% 30%, #e88b83, #b13c33 55%, #6f1f19);
+    box-shadow:0 2px 3px rgba(0,0,0,.45);
+  }
+  .guide-paper::before{ left:14px; }
+  .guide-paper::after{ right:14px; }
+
+  .guide h2{
+    font-family:Georgia,serif;
+    text-align:center;
+    color:#5e3f26;
+    letter-spacing:.14em;
+    font-size:1.25rem;
+    margin-bottom:2px;
+  }
+  .guide h2 .leaf{ color:#6f8f57; font-size:.7em; vertical-align:.3em; letter-spacing:0; }
+  .guide h3{
+    font-size:.76rem;
+    text-transform:uppercase;
+    letter-spacing:.15em;
+    color:#6b4a2c;
+    border-bottom:1px solid rgba(107,74,44,.35);
+    padding-bottom:3px;
+    margin:16px 0 8px;
+  }
+  .guide p, .guide li{ font-size:.88rem; line-height:1.55; }
+  .guide ul{ list-style:none; margin:0; padding:0; }
+  .guide li{ display:flex; align-items:flex-start; gap:9px; margin-bottom:8px; }
+  .guide .gi{ flex:0 0 26px; width:26px; height:26px; margin-top:1px; }
+  .guide .gi svg{ width:100%; height:100%; display:block; }
+  .guide .sp-name{ color:#9c741f; font-weight:700; }
+  .guide .plus{ color:#4a7a3c; font-weight:700; }
+  .guide kbd{
+    background:#e4dcc4;
+    border:1px solid #b8ab8a;
+    border-radius:4px;
+    padding:0 5px;
+    font-family:inherit;
+    font-size:.92em;
+    color:#4a3a20;
+  }
+  .guide-close{ display:block; margin:18px auto 0; }
+
+  /* ---------- Vaellus: varustevalinta ja sirut ---------- */
+  .draft-paper{
+    width:min(430px, 100%);
+    background:linear-gradient(180deg, #213627, #1a2c20);
+    border:2px solid #3a5a44;
+    border-radius:16px;
+    padding:18px 16px 20px;
+    box-shadow:0 18px 50px rgba(0,0,0,.6);
+    text-align:center;
+  }
+  .draft-paper h2{
+    font-family:Georgia,serif;
+    color:var(--gold);
+    letter-spacing:.1em;
+    margin-bottom:14px;
+    font-size:1.3rem;
+  }
+  .cards{ display:flex; flex-direction:column; gap:10px; }
+  .card{
+    font:inherit;
+    text-align:left;
+    display:grid;
+    grid-template-columns:44px 1fr;
+    grid-template-rows:auto auto;
+    column-gap:12px;
+    background:var(--bg-moss);
+    border:2px solid #35543e;
+    border-radius:12px;
+    color:var(--cream);
+    padding:12px 14px;
+    cursor:pointer;
+    transition:transform .12s ease, border-color .12s ease;
+  }
+  .card:hover{ transform:translateY(-2px); border-color:var(--gold); }
+  .card:focus-visible{ outline:3px solid var(--cream); outline-offset:2px; }
+  .card .cicon{ grid-row:1/3; font-size:1.7rem; align-self:center; text-align:center; }
+  .card .cname{ font-weight:800; color:var(--gold); }
+  .card .cdesc{ font-size:.85rem; color:var(--cream-dim); line-height:1.4; }
+  .card.curse{ border-color:#7a3a34; }
+  .card.curse .cname{ color:#e88b83; }
+  .card.amu .cname{ color:#8fd08a; }
+  .goals .chip .pi{ font-size:1rem; }
+  .goals.perks .chip{ font-size:.78rem; padding:4px 10px 4px 6px; }
+  .goals .chip.curse{ border-color:#7a3a34; }
+  .goals .chip.amu{ border-color:var(--gold); color:var(--gold); }
+  .card.branch{ border-color:#4a6f8a; }
+  .card.branch .cname{ color:#8fc7e8; }
+  .card.disabled{ opacity:.45; cursor:default; }
+  .card.disabled:hover{ transform:none; border-color:#35543e; }
+
+  /* ---------- Kohtaamiset ---------- */
+  .enc-head{ font-size:2.6rem; text-align:center; margin-bottom:2px; }
+  .enc-text{
+    color:var(--cream-dim);
+    font-size:.92rem;
+    line-height:1.6;
+    margin:8px 0 14px;
+    text-align:center;
+  }
+  .enc-result{
+    color:var(--cream);
+    font-size:1rem;
+    line-height:1.7;
+    text-align:center;
+    margin:12px 0 16px;
+  }
+  .enc-result b{ color:var(--gold); }
+
+  /* ---------- Matkajana ---------- */
+  .trail{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    margin-bottom:2px;
+  }
+  .trail .tnode{
+    width:22px; height:22px;
+    border-radius:50%;
+    background:var(--bg-moss);
+    border:2px solid #35543e;
+    color:var(--cream-dim);
+    font-size:.62rem;
+    font-weight:800;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    flex:none;
+  }
+  .trail .tnode.done{ background:var(--gold); border-color:#a37f2c; color:#3a2c10; }
+  .trail .tnode.cur{ border-color:var(--cream); color:var(--cream); box-shadow:0 0 7px rgba(242,237,222,.45); }
+  .trail .tnode.done.cur{ color:#3a2c10; }
+  .trail .tlink{
+    width:9px; height:2px;
+    background:rgba(242,237,222,.22);
+    flex:none;
+  }
+  .trail .tlink.done{ background:var(--gold); }
+  .trail-label{
+    text-align:center;
+    font-size:.72rem;
+    color:var(--cream-dim);
+    letter-spacing:.08em;
+    margin-bottom:10px;
+  }
+
+  /* ---------- Aitta ---------- */
+  .shop-paper{
+    max-height:min(84vh, 640px);
+    overflow-y:auto;
+  }
+  .shop-balance{
+    color:var(--gold);
+    font-weight:800;
+    margin-bottom:10px;
+    font-variant-numeric:tabular-nums;
+  }
+  .shop-section{
+    font-family:Georgia,serif;
+    color:var(--cream-dim);
+    letter-spacing:.08em;
+    font-size:.85rem;
+    margin:14px 0 8px;
+    text-transform:uppercase;
+  }
+  .card .cprice{
+    grid-row:1/3;
+    grid-column:3;
+    align-self:center;
+    font-weight:800;
+    color:var(--gold);
+    font-variant-numeric:tabular-nums;
+    white-space:nowrap;
+  }
+  .card.shopitem{ grid-template-columns:44px 1fr auto; }
+  .card.soldout .cprice{ color:#8fd08a; }
+  .charpower{
+    font-size:.8rem;
+    color:var(--cream-dim);
+    margin:-6px 0 12px;
+    min-height:1.2em;
+  }
+
+  /* ---------- Minipelit ---------- */
+  .mini-wrap{ position:relative; }
+  #miniCanvas{
+    display:block;
+    width:min(92vw, 380px);
+    height:auto;
+    border-radius:16px;
+    border:2px solid #3a5a44;
+    box-shadow:0 18px 50px rgba(0,0,0,.65);
+    touch-action:manipulation;
+  }
+  .mini-result{
+    position:absolute;
+    inset:0;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:10px;
+    text-align:center;
+    background:rgba(13,22,16,.85);
+    border-radius:16px;
+    padding:20px;
+  }
+  .mini-result.hidden{ display:none; }
+  .mini-result h2{
+    font-family:Georgia,serif;
+    color:var(--gold);
+    letter-spacing:.06em;
+    font-size:1.5rem;
+  }
+  .mini-result .lines{ color:var(--cream); line-height:1.8; font-size:1rem; }
+
+  /* ---------- Usva (akti 2) ---------- */
+  .fog{
+    position:absolute;
+    inset:6%;
+    border-radius:26%;
+    background:
+      radial-gradient(circle at 35% 30%, rgba(232,236,238,.95), rgba(178,192,198,.9) 60%, rgba(140,158,166,.88)),
+      #9fb0b6;
+    box-shadow:inset 0 -2px 5px rgba(70,90,98,.5), 0 1px 3px rgba(0,0,0,.3);
+    animation:fogDrift 3.4s ease-in-out infinite;
+  }
+  @keyframes fogDrift{
+    0%,100%{ opacity:.94; transform:scale(1); }
+    50%{ opacity:.82; transform:scale(1.04); }
+  }
+  @media (prefers-reduced-motion: reduce){
+    .fog{ animation:none; }
+  }
+
+  /* ---------- Aktien tunnelmat ---------- */
+  body.act-2{
+    background:
+      radial-gradient(1200px 700px at 50% -10%, #3a4230 0%, transparent 60%),
+      #141a12;
+  }
+  body.act-2 .board{ border-color:#4a5238; }
+  body.act-3{
+    background:
+      radial-gradient(1200px 700px at 50% -10%, #26333f 0%, transparent 60%),
+      #0d141b;
+  }
+  body.act-3 .board{ border-color:#3a4a5a; }
+
+  /* ---------- Pomotaistelu ---------- */
+  .bossbar{
+    flex:none;
+    position:relative;
+    width:min(92vw, 460px);
+    margin-bottom:5px;
+    background:var(--bg-moss);
+    border:1px solid #7a3a34;
+    border-radius:12px;
+    padding:6px 12px 7px;
+    box-shadow:0 3px 8px var(--shadow);
+  }
+  .bossbar.hidden{ display:none; }
+  .bossbar .brow{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    gap:8px;
+  }
+  .bossbar .bname{
+    font-family:Georgia,serif;
+    font-weight:700;
+    letter-spacing:.08em;
+    color:#e88b83;
+  }
+  .bossbar.enraged .bname{ color:#e8743c; animation:lowPulse 1s ease-in-out infinite; }
+  .bossbar .btele{
+    font-size:.78rem;
+    font-weight:800;
+    color:var(--cream-dim);
+    font-variant-numeric:tabular-nums;
+  }
+  .bossbar .btrack{
+    position:relative;
+    height:15px;
+    background:#0f1b14;
+    border:1px solid #46282a;
+    border-radius:999px;
+    margin-top:4px;
+    overflow:hidden;
+  }
+  .bossbar .bnum{
+    position:absolute;
+    inset:0;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-size:.62rem;
+    font-weight:800;
+    color:rgba(242,237,222,.9);
+    text-shadow:0 1px 2px rgba(0,0,0,.7);
+    font-variant-numeric:tabular-nums;
+    pointer-events:none;
+  }
+  .bossbar .bfill{
+    height:100%;
+    background:linear-gradient(90deg, #8e2a25, #c8443c);
+    border-radius:999px;
+    transition:width .3s ease;
+  }
+  .bossbar.enraged .bfill{ background:linear-gradient(90deg, #c8443c, #e8743c); }
+  .board.enrage{
+    box-shadow:0 10px 30px var(--shadow),
+      inset 0 0 44px rgba(200,68,60,.22),
+      inset 0 0 0 6px rgba(0,0,0,.12);
+  }
+
+  /* ---------- Päävalikon hahmot ---------- */
+  .charrow{
+    display:flex;
+    justify-content:center;
+    gap:10px;
+    margin-bottom:14px;
+  }
+  .char{
+    font:inherit;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:4px;
+    width:82px;
+    padding:12px 6px 10px;
+    font-size:1.7rem;
+    background:var(--bg-moss);
+    border:2px solid #35543e;
+    border-radius:12px;
+    color:var(--cream);
+    cursor:pointer;
+  }
+  .char span{
+    font-size:.66rem;
+    font-weight:800;
+    letter-spacing:.02em;
+    line-height:1.15;
+    white-space:normal;
+    hyphens:auto;
+    text-align:center;
+    max-width:100%;
+  }
+  .char.sel{ border-color:var(--gold); box-shadow:0 0 10px rgba(229,185,84,.35); }
+  .char.locked{ opacity:.45; cursor:default; }
+  .mini-result .lines b{ font-variant-numeric:tabular-nums; }
+
+  @media (max-width: 430px){
+    h1{ font-size:1.55rem; letter-spacing:.14em; }
+    .tagline{ font-size:.72rem; margin-bottom:10px; }
+    .stats{ gap:6px; }
+    .stat{ padding:6px 4px 7px; }
+    .stat .value{ font-size:1.05rem; }
+    .bossbar{ margin-bottom:8px; }
+    .char{ width:72px; padding:10px 4px 8px; font-size:1.45rem; }
+    .charrow{ gap:7px; flex-wrap:wrap; }
+    .guide-btn{ margin-top:14px; transform:rotate(-1.4deg) scale(.88); }
+    .draft-paper{ padding:14px 12px 16px; }
+    .overlay.menu .btn{ display:block; margin:8px auto 0; width:min(260px, 80vw); }
+  }
+
+  @media (max-height: 760px){
+    header{ margin-bottom:5px; }
+    h1{ font-size:1.5rem; }
+    .tagline{ font-size:.68rem; margin-bottom:5px; }
+    .stats{ margin-bottom:5px; }
+    #hudrow{ margin-bottom:5px; }
+    .bossbar{ margin-bottom:4px; }
+    .controls{ margin-top:8px; }
+    .guide-btn{ margin-top:10px; }
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    .tile, .tile.falling{ transition:transform .01s linear; }
+    .tile.pop{ transition:opacity .01s linear; }
+    .banner.show{ animation-duration:.4s; }
+    .tile.sp::before, .tile.wild::before{ animation:none; }
+    .tile.hint svg:first-child{ animation:none; }
+    .fx{ animation-duration:.15s !important; }
+    .stat .value.moves-low{ animation:none; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>POIMURI <span class="leaf">❦</span></h1>
+  <div class="tagline">🛠 KEHITTÄJÄVERSIO – työkalut oikeasta alakulmasta</div>
+</header>
+
+<div class="stats">
+  <div class="stat"><div class="label">Pisteet</div><div class="value" id="score">0</div></div>
+  <div class="stat" id="movesStat"><div class="label" id="movesLabel">Siirrot</div><div class="value" id="moves">30</div></div>
+  <div class="stat"><div class="label" id="bestLabel">Korpi</div><div class="value" id="best">–</div></div>
+  <button class="stat inv hidden" id="invBtn" aria-label="Avaa reppu">
+    <div class="label">Reppu</div><div class="value" id="invBadge">🎒</div>
+  </button>
+</div>
+
+<div class="bossbar hidden" id="bossbar" aria-label="Pomon tila"></div>
+
+<div id="hudrow">
+  <div class="goals hidden" id="goals" aria-label="Tavoitteet"></div>
+</div>
+
+<div class="board-wrap">
+  <div class="board" id="board" aria-label="Pelilauta">
+    <div class="sel-ring" id="selRing"></div>
+    <div class="cursor-ring" id="curRing"></div>
+    <div class="banner" id="banner"></div>
+    <div class="overlay" id="overlay">
+      <h2 id="ovTitle">Kori täynnä!</h2>
+      <div class="final" id="ovText"></div>
+      <button class="btn" id="ovBtn">Uusi retki</button>
+    </div>
+  </div>
+</div>
+
+<div class="controls">
+  <button class="btn small" id="restartBtn">Päävalikko</button>
+  <button class="btn small iconbtn" id="soundBtn" aria-pressed="true" aria-label="Äänitehosteet päälle/pois" title="Äänitehosteet">🔊</button>
+  <button class="btn small iconbtn" id="musicBtn" aria-pressed="true" aria-label="Musiikki päälle/pois" title="Musiikki">🎵</button>
+</div>
+
+<button class="guide-btn" id="guideBtn" aria-label="Avaa Poimijan opas">
+    <span class="book-spine"></span>
+    <span class="book-face"><span class="book-band"></span>Poimijan<br>opas<span class="book-leaf">❦</span></span>
+  </button>
+
+<div class="guide-overlay" id="draftOverlay" role="dialog" aria-modal="true" aria-label="Varustevalinta">
+  <div class="draft-paper">
+    <h2>Valitse varuste</h2>
+    <div class="cards" id="draftCards"></div>
+  </div>
+</div>
+
+<div class="guide-overlay" id="shopOverlay" role="dialog" aria-modal="true" aria-label="Aitta">
+  <div class="draft-paper shop-paper">
+    <h2>Aitta</h2>
+    <div class="shop-balance" id="shopBalance"></div>
+    <div id="shopBody"></div>
+    <button class="btn small guide-close" id="shopClose">Takaisin</button>
+  </div>
+</div>
+
+<div class="guide-overlay" id="invOverlay" role="dialog" aria-modal="true" aria-label="Reppu">
+  <div class="draft-paper shop-paper">
+    <h2>Reppu</h2>
+    <div id="invBody"></div>
+    <button class="btn small guide-close" id="invClose">Takaisin</button>
+  </div>
+</div>
+
+<div class="guide-overlay" id="encOverlay" role="dialog" aria-modal="true" aria-label="Kohtaaminen">
+  <div class="draft-paper"><div id="encBody"></div></div>
+</div>
+
+<div class="guide-overlay" id="miniOverlay" role="dialog" aria-modal="true" aria-label="Minipeli">
+  <div class="mini-wrap">
+    <canvas id="miniCanvas" width="360" height="540"></canvas>
+    <div class="mini-result hidden" id="miniResult"></div>
+  </div>
+</div>
+
+<div class="guide-overlay" id="guideOverlay" role="dialog" aria-modal="true" aria-label="Poimijan opas">
+  <div class="guide">
+    <div class="guide-paper">
+      <h2>POIMIJAN OPAS <span class="leaf">❦</span></h2>
+      <div id="guideBody"></div>
+      <button class="btn small guide-close" id="guideClose">Takaisin metsään</button>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+
+/* =========================================================
+   POIMURI – marjametsän match 3 + erikoispalat + Kiri-tila
+   Yhden tiedoston selainpeli, ei riippuvuuksia.
+   ========================================================= */
+
+const COLS = 8, ROWS = 8, NTYPES = 6, START_MOVES = 30;
+
+/* ---------- SVG-poimittavat ---------- */
+/* Laattojen aktisetit: samat kuusi värilokeroa, laji vaihtuu alueittain.
+   Akti 1 Metsä · Akti 2 Suo · Akti 3 Pohjola */
+const ICON_SET_1 = [
+  /* 0 mustikka */
+  `<svg viewBox="0 0 48 48" aria-label="mustikka"><circle cx="24" cy="26" r="16" fill="#5b6fb5"/><circle cx="24" cy="26" r="16" fill="url(#g0)"/><defs><radialGradient id="g0" cx=".35" cy=".3" r="1"><stop offset="0" stop-color="#8fa0dd"/><stop offset=".55" stop-color="#5b6fb5"/><stop offset="1" stop-color="#3d4e8c"/></radialGradient></defs><path d="M24 8c1.5 2.5 1.5 4.5 0 7-1.5-2.5-1.5-4.5 0-7z" fill="#5f7d4f"/><path d="M19 21l2.5 3.2L24 20l2.5 4.2L29 21l-1.6 4.6h-6.8L19 21z" fill="#2c3a6e" opacity=".85"/><ellipse cx="18" cy="20" rx="4.5" ry="3" fill="#fff" opacity=".28"/></svg>`,
+  /* 1 puolukka */
+  `<svg viewBox="0 0 48 48" aria-label="puolukka"><ellipse cx="30" cy="13" rx="8" ry="4.5" fill="#5f7d4f" transform="rotate(-24 30 13)"/><circle cx="17" cy="29" r="10.5" fill="url(#g1)"/><circle cx="32" cy="31" r="9" fill="url(#g1)"/><defs><radialGradient id="g1" cx=".35" cy=".3" r="1"><stop offset="0" stop-color="#ef8078"/><stop offset=".5" stop-color="#c8443c"/><stop offset="1" stop-color="#8e2a25"/></radialGradient></defs><circle cx="17" cy="29" r="1.6" fill="#7c241f"/><circle cx="32" cy="31" r="1.4" fill="#7c241f"/><ellipse cx="13" cy="24" rx="3.5" ry="2.4" fill="#fff" opacity=".3"/></svg>`,
+  /* 2 lakka */
+  `<svg viewBox="0 0 48 48" aria-label="lakka"><path d="M24 9l3 5h-6l3-5z" fill="#5f7d4f"/><g fill="url(#g2)"><circle cx="24" cy="19" r="6.2"/><circle cx="16.5" cy="27" r="6.2"/><circle cx="31.5" cy="27" r="6.2"/><circle cx="20" cy="35" r="6.2"/><circle cx="28" cy="35" r="6.2"/></g><defs><radialGradient id="g2" cx=".35" cy=".3" r="1"><stop offset="0" stop-color="#ffd27a"/><stop offset=".55" stop-color="#e8a33d"/><stop offset="1" stop-color="#b56f1d"/></radialGradient></defs><ellipse cx="21.5" cy="16.5" rx="2.4" ry="1.7" fill="#fff" opacity=".4"/></svg>`,
+  /* 3 vadelma */
+  `<svg viewBox="0 0 48 48" aria-label="vadelma"><path d="M24 7l4 4.5h-8L24 7z" fill="#5f7d4f"/><path d="M15 12h18l-2 3H17l-2-3z" fill="#6e9159"/><g fill="url(#g3)"><circle cx="17" cy="20" r="5.4"/><circle cx="24" cy="19" r="5.4"/><circle cx="31" cy="20" r="5.4"/><circle cx="19" cy="28" r="5.4"/><circle cx="29" cy="28" r="5.4"/><circle cx="24" cy="36" r="5.4"/></g><defs><radialGradient id="g3" cx=".35" cy=".3" r="1"><stop offset="0" stop-color="#ea9ab4"/><stop offset=".5" stop-color="#c75d7e"/><stop offset="1" stop-color="#94375a"/></radialGradient></defs><ellipse cx="20.5" cy="17.5" rx="2.2" ry="1.6" fill="#fff" opacity=".35"/></svg>`,
+  /* 4 kanttarelli */
+  `<svg viewBox="0 0 48 48" aria-label="kanttarelli"><path d="M24 41c-3 0-5-2-5-5l1-9h8l1 9c0 3-2 5-5 5z" fill="url(#g4b)"/><path d="M8 16c4-5 28-5 32 0 1.5 2-2 6-7 8-3 1.2-5 3-9 3s-6-1.8-9-3c-5-2-8.5-6-7-8z" fill="url(#g4)"/><path d="M10 15.5c5 2.5 23 2.5 28 0" stroke="#b5841e" stroke-width="1.4" fill="none" opacity=".6"/><defs><radialGradient id="g4" cx=".4" cy=".15" r="1.1"><stop offset="0" stop-color="#f4d36e"/><stop offset=".55" stop-color="#e5b954"/><stop offset="1" stop-color="#c08c25"/></radialGradient><linearGradient id="g4b" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#d9ab3e"/><stop offset=".5" stop-color="#eccb6f"/><stop offset="1" stop-color="#c79a30"/></linearGradient></defs></svg>`,
+  /* 5 herkkutatti */
+  `<svg viewBox="0 0 48 48" aria-label="herkkutatti"><path d="M24 42c-4.5 0-7-2.5-7-6l1.2-12h11.6L31 36c0 3.5-2.5 6-7 6z" fill="url(#g5b)"/><path d="M7 22c0-9 7.5-14 17-14s17 5 17 14c0 3-3 4.5-17 4.5S7 25 7 22z" fill="url(#g5)"/><defs><radialGradient id="g5" cx=".4" cy=".2" r="1.1"><stop offset="0" stop-color="#b08458"/><stop offset=".55" stop-color="#8a6240"/><stop offset="1" stop-color="#5e3f26"/></radialGradient><linearGradient id="g5b" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#d8c8a8"/><stop offset=".5" stop-color="#efe3c8"/><stop offset="1" stop-color="#cdbb96"/></linearGradient></defs><ellipse cx="17" cy="14" rx="4.5" ry="2.6" fill="#fff" opacity=".22"/></svg>`
+];
+
+/* kultakäpy (jokeri) */
+const WILD_ICON =
+  `<svg viewBox="0 0 48 48" aria-label="kultakäpy"><path d="M24 6c1.4 2.2 1.4 4 0 6-1.4-2-1.4-3.8 0-6z" fill="#5f7d4f"/>` +
+  `<g fill="url(#gw)" stroke="#9c741f" stroke-width=".8">` +
+  `<circle cx="19" cy="16" r="4.6"/><circle cx="29" cy="16" r="4.6"/>` +
+  `<circle cx="14" cy="23" r="4.6"/><circle cx="24" cy="23" r="4.6"/><circle cx="34" cy="23" r="4.6"/>` +
+  `<circle cx="17" cy="30" r="4.6"/><circle cx="31" cy="30" r="4.6"/><circle cx="24" cy="31" r="4.6"/>` +
+  `<circle cx="20" cy="37" r="4.2"/><circle cx="28" cy="37" r="4.2"/><circle cx="24" cy="41" r="3.6"/>` +
+  `</g>` +
+  `<defs><radialGradient id="gw" cx=".35" cy=".3" r="1"><stop offset="0" stop-color="#ffe9a3"/><stop offset=".55" stop-color="#e5b954"/><stop offset="1" stop-color="#b5841e"/></radialGradient></defs>` +
+  `<path d="M9 10l1.1 2.6L12.7 14l-2.6 1.1L9 17.7l-1.1-2.6L5.3 14l2.6-1.4L9 10z" fill="#fff" opacity=".9"/>` +
+  `<path d="M39 32l.9 2.1 2.1.9-2.1.9-.9 2.1-.9-2.1-2.1-.9 2.1-.9.9-2.1z" fill="#fff" opacity=".85"/></svg>`;
+
+/* erikoispalojen merkit */
+const BADGES = {
+  1: `<svg class="badge" viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="#1c1408" opacity=".88"/><path d="M3.8 12h16.4M7 8.6L3.8 12 7 15.4M17 8.6l3.2 3.4-3.2 3.4" stroke="#e5b954" stroke-width="2.1" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  2: `<svg class="badge" viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="#1c1408" opacity=".88"/><path d="M12 3.8v16.4M8.6 7L12 3.8 15.4 7M8.6 17l3.4 3.2 3.4-3.2" stroke="#e5b954" stroke-width="2.1" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  3: `<svg class="badge" viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="#1c1408" opacity=".88"/><ellipse cx="12" cy="14.5" rx="4.6" ry="3.8" fill="#e5b954"/><circle cx="6.6" cy="10.6" r="2" fill="#e5b954"/><circle cx="12" cy="8.4" r="2.1" fill="#e5b954"/><circle cx="17.4" cy="10.6" r="2" fill="#e5b954"/></svg>`
+};
+
+const PRAISE = ["", "", "Ketju ×2!", "Hyvä apaja!", "Mahtisaalis!", "Marjakuningas!"]; 
+
+const ICON_SET_2 = [
+  /* 0 juolukka */
+  `<svg viewBox="0 0 48 48" aria-label="juolukka"><ellipse cx="31" cy="12" rx="7" ry="3.6" fill="#7d9464" transform="rotate(-18 31 12)"/><circle cx="18" cy="27" r="10" fill="url(#a2g0)"/><circle cx="31" cy="30" r="8" fill="url(#a2g0)"/><defs><radialGradient id="a2g0" cx=".35" cy=".3" r="1"><stop offset="0" stop-color="#a9b6d8"/><stop offset=".5" stop-color="#6f7fae"/><stop offset="1" stop-color="#4a5580"/></radialGradient></defs><circle cx="18" cy="27" r="2" fill="#39406b" opacity=".7"/><ellipse cx="14" cy="22.5" rx="3.6" ry="2.4" fill="#fff" opacity=".3"/></svg>`,
+  /* 1 karpalo */
+  `<svg viewBox="0 0 48 48" aria-label="karpalo"><path d="M24 6q-2 8 0 13" stroke="#7d9464" stroke-width="2" fill="none"/><ellipse cx="24" cy="29" rx="11.5" ry="13" fill="url(#a2g1)"/><defs><radialGradient id="a2g1" cx=".35" cy=".28" r="1"><stop offset="0" stop-color="#f08a7e"/><stop offset=".5" stop-color="#c03a35"/><stop offset="1" stop-color="#851f1f"/></radialGradient></defs><circle cx="24" cy="19" r="1.5" fill="#6e1a18"/><ellipse cx="19" cy="22" rx="3.6" ry="2.6" fill="#fff" opacity=".32"/></svg>`,
+  /* 2 suomuurain */
+  `<svg viewBox="0 0 48 48" aria-label="suomuurain"><path d="M14 15l5 4M34 15l-5 4M24 9v7" stroke="#7d9464" stroke-width="2.4" fill="none" stroke-linecap="round"/><g fill="url(#a2g2)"><circle cx="24" cy="22" r="7"/><circle cx="16.5" cy="30" r="7"/><circle cx="31.5" cy="30" r="7"/><circle cx="24" cy="37" r="6"/></g><defs><radialGradient id="a2g2" cx=".35" cy=".3" r="1"><stop offset="0" stop-color="#ffe09a"/><stop offset=".55" stop-color="#eaa945"/><stop offset="1" stop-color="#b06f22"/></radialGradient></defs><ellipse cx="21" cy="19.5" rx="2.6" ry="1.8" fill="#fff" opacity=".4"/></svg>`,
+  /* 3 suopursu */
+  `<svg viewBox="0 0 48 48" aria-label="suopursu"><path d="M24 40V22" stroke="#5f7d4f" stroke-width="2.6"/><path d="M24 32l-6 5M24 32l6 5" stroke="#5f7d4f" stroke-width="2"/><g fill="url(#a2g3)"><circle cx="24" cy="14" r="4.6"/><circle cx="16.5" cy="18" r="4.6"/><circle cx="31.5" cy="18" r="4.6"/><circle cx="19.5" cy="24.5" r="4.6"/><circle cx="28.5" cy="24.5" r="4.6"/></g><defs><radialGradient id="a2g3" cx=".35" cy=".3" r="1"><stop offset="0" stop-color="#ffffff"/><stop offset=".55" stop-color="#f3dfe6"/><stop offset="1" stop-color="#cfa3b8"/></radialGradient></defs><circle cx="24" cy="19.5" r="2.6" fill="#e8ce62"/></svg>`,
+  /* 4 rentukka */
+  `<svg viewBox="0 0 48 48" aria-label="rentukka"><path d="M24 41V26" stroke="#4c7a45" stroke-width="2.8"/><path d="M15 38q6-4 9-2" stroke="#4c7a45" stroke-width="2.4" fill="none"/><g fill="url(#a2g4)"><ellipse cx="24" cy="14" rx="5.4" ry="6.4"/><ellipse cx="16" cy="19" rx="6.4" ry="5.4" transform="rotate(-30 16 19)"/><ellipse cx="32" cy="19" rx="6.4" ry="5.4" transform="rotate(30 32 19)"/><ellipse cx="19" cy="26" rx="6" ry="5.2" transform="rotate(-70 19 26)"/><ellipse cx="29" cy="26" rx="6" ry="5.2" transform="rotate(70 29 26)"/></g><defs><radialGradient id="a2g4" cx=".4" cy=".35" r="1"><stop offset="0" stop-color="#ffe873"/><stop offset=".6" stop-color="#f2c531"/><stop offset="1" stop-color="#c39312"/></radialGradient></defs><circle cx="24" cy="20.5" r="3.4" fill="#d99a12"/></svg>`,
+  /* 5 mesisieni */
+  `<svg viewBox="0 0 48 48" aria-label="mesisieni"><g><rect x="14" y="24" width="5" height="14" rx="2.4" fill="#e3d3ae"/><rect x="22" y="21" width="5.4" height="17" rx="2.6" fill="#e3d3ae"/><rect x="30.5" y="25" width="4.6" height="13" rx="2.2" fill="#e3d3ae"/></g><g fill="url(#a2g5)"><ellipse cx="16.5" cy="22" rx="7.6" ry="5"/><ellipse cx="24.7" cy="18" rx="8.6" ry="5.6"/><ellipse cx="33" cy="23" rx="7" ry="4.6"/></g><defs><radialGradient id="a2g5" cx=".4" cy=".3" r="1"><stop offset="0" stop-color="#d9a86a"/><stop offset=".55" stop-color="#a9763c"/><stop offset="1" stop-color="#7a5124"/></radialGradient></defs><circle cx="24.7" cy="16.5" r="1.2" fill="#7a5124"/><circle cx="20.5" cy="18.5" r="1" fill="#7a5124"/></svg>`
+];
+
+const ICON_SET_3 = [
+  /* 0 variksenmarja */
+  `<svg viewBox="0 0 48 48" aria-label="variksenmarja"><g stroke="#4c6a4a" stroke-width="2" stroke-linecap="round"><path d="M12 20l6-3M14 28l6-2M32 18l4-4M30 27l6-1"/></g><circle cx="24" cy="27" r="12" fill="url(#a3g0)"/><defs><radialGradient id="a3g0" cx=".35" cy=".28" r="1"><stop offset="0" stop-color="#6c7896"/><stop offset=".5" stop-color="#343c55"/><stop offset="1" stop-color="#181c2c"/></radialGradient></defs><ellipse cx="19" cy="21.5" rx="3.8" ry="2.6" fill="#fff" opacity=".28"/></svg>`,
+  /* 1 pihlajanmarja */
+  `<svg viewBox="0 0 48 48" aria-label="pihlajanmarja"><path d="M24 7v8M24 15l-7 4M24 15l7 4" stroke="#6d8556" stroke-width="2.2" fill="none"/><g fill="url(#a3g1)"><circle cx="17" cy="24" r="6"/><circle cx="31" cy="24" r="6"/><circle cx="15.5" cy="33.5" r="6"/><circle cx="24" cy="30" r="6"/><circle cx="32.5" cy="33.5" r="6"/></g><defs><radialGradient id="a3g1" cx=".35" cy=".3" r="1"><stop offset="0" stop-color="#ff9d69"/><stop offset=".5" stop-color="#d9502c"/><stop offset="1" stop-color="#93301a"/></radialGradient></defs><circle cx="24" cy="30" r="1.3" fill="#6e2413"/><circle cx="17" cy="24" r="1.2" fill="#6e2413"/></svg>`,
+  /* 2 riekonmarja */
+  `<svg viewBox="0 0 48 48" aria-label="riekonmarja"><path d="M24 40q-2-10 0-18" stroke="#8a6a3e" stroke-width="2.4" fill="none"/><g fill="#7d9464"><ellipse cx="17" cy="34" rx="4.6" ry="2.4" transform="rotate(-24 17 34)"/><ellipse cx="31" cy="34" rx="4.6" ry="2.4" transform="rotate(24 31 34)"/></g><g fill="url(#a3g2)"><circle cx="19" cy="19" r="7.4"/><circle cx="30" cy="23" r="6.4"/></g><defs><radialGradient id="a3g2" cx=".35" cy=".3" r="1"><stop offset="0" stop-color="#ffc27a"/><stop offset=".5" stop-color="#e08033"/><stop offset="1" stop-color="#9c4f16"/></radialGradient></defs><ellipse cx="15.5" cy="15.5" rx="3" ry="2.1" fill="#fff" opacity=".35"/></svg>`,
+  /* 3 sielikkö */
+  `<svg viewBox="0 0 48 48" aria-label="sielikkö"><path d="M10 38q14 6 28 0" stroke="#4c6a4a" stroke-width="4" fill="none" stroke-linecap="round"/><g fill="url(#a3g3)"><circle cx="16" cy="24" r="5.6"/><circle cx="24" cy="19" r="5.6"/><circle cx="32" cy="24" r="5.6"/><circle cx="20" cy="31" r="5.2"/><circle cx="28" cy="31" r="5.2"/></g><defs><radialGradient id="a3g3" cx=".38" cy=".32" r="1"><stop offset="0" stop-color="#f7c4d8"/><stop offset=".55" stop-color="#d9749f"/><stop offset="1" stop-color="#a2456f"/></radialGradient></defs><circle cx="24" cy="25" r="2.2" fill="#8a3159"/></svg>`,
+  /* 4 kultapiisku */
+  `<svg viewBox="0 0 48 48" aria-label="kultapiisku"><path d="M24 42V16" stroke="#5c7a3e" stroke-width="2.8"/><path d="M24 34l-6 4M24 34l6 4" stroke="#5c7a3e" stroke-width="2.2"/><g fill="url(#a3g4)"><circle cx="24" cy="10" r="3.6"/><circle cx="18.5" cy="14.5" r="3.6"/><circle cx="29.5" cy="14.5" r="3.6"/><circle cx="16" cy="20.5" r="3.6"/><circle cx="24" cy="18" r="3.6"/><circle cx="32" cy="20.5" r="3.6"/><circle cx="19.5" cy="25.5" r="3.4"/><circle cx="28.5" cy="25.5" r="3.4"/></g><defs><radialGradient id="a3g4" cx=".4" cy=".35" r="1"><stop offset="0" stop-color="#ffe89a"/><stop offset=".55" stop-color="#e9bd3f"/><stop offset="1" stop-color="#b58a18"/></radialGradient></defs></svg>`,
+  /* 5 poronjäkälä */
+  `<svg viewBox="0 0 48 48" aria-label="poronjäkälä"><g stroke="url(#a3g5)" stroke-width="3.4" stroke-linecap="round" fill="none"><path d="M24 40V26M24 26q-6-2-8-9M24 26q6-2 8-9M16 17q-3-2-4-6M16 17q2-4 1-8M32 17q3-2 4-6M32 17q-2-4-1-8"/></g><defs><linearGradient id="a3g5" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#8f9683"/><stop offset=".5" stop-color="#c4c9b4"/><stop offset="1" stop-color="#e7ead9"/></linearGradient></defs><circle cx="15" cy="9" r="1.6" fill="#e7ead9"/><circle cx="33" cy="9" r="1.6" fill="#e7ead9"/></svg>`
+];
+
+const ICON_SETS = [ICON_SET_1, ICON_SET_2, ICON_SET_3];
+let ICONS = ICON_SET_1;
+
+const DROP_ICON =
+  `<svg viewBox="0 0 48 48" aria-label="käpykori">` +
+  `<ellipse cx="19" cy="16" rx="5" ry="7" fill="url(#gdk)" transform="rotate(-15 19 16)"/>` +
+  `<ellipse cx="29" cy="15" rx="5" ry="7" fill="url(#gdk)" transform="rotate(12 29 15)"/>` +
+  `<path d="M9 19h30l-3.5 17c-.5 2.4-2.2 4-4.6 4H17c-2.4 0-4.1-1.6-4.6-4L9 19z" fill="url(#gdb)"/>` +
+  `<path d="M10.5 25.5h27M11.8 31.5h24.4M13.1 37.5h21.8" stroke="#5e3f26" stroke-width="1.6" opacity=".55"/>` +
+  `<path d="M9 19h30" stroke="#4a3016" stroke-width="3" stroke-linecap="round"/>` +
+  `<defs><linearGradient id="gdb" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#a87c4f"/><stop offset="1" stop-color="#7a5533"/></linearGradient>` +
+  `<radialGradient id="gdk" cx=".35" cy=".3" r="1"><stop offset="0" stop-color="#e5b954"/><stop offset="1" stop-color="#9c741f"/></radialGradient></defs></svg>`;
+
+/* =========================================================
+   Vaellus-tilan varusteet, kiroukset ja Ukonvaaja
+   ========================================================= */
+
+const PERKS = {
+  noppa:    { icon: "🎲", name: "Marjanoppa",    desc: "+2 siirtoa jokaisella etapilla.", max: 3 },
+  puukko:   { icon: "🔪", name: "Puukko",        desc: "Neljän sarja tuottaa karhunkäpälän haravan sijaan.", max: 1 },
+  hunaja:   { icon: "🍯", name: "Hunajapurkki",  desc: "Ketjukerroin +1 jokaisessa jatkoketjussa.", max: 2 },
+  virsut:   { icon: "🥾", name: "Tuohivirsut",   desc: "Jää särkyy ja pala poimiutuu samalla osumalla.", max: 1 },
+  sukat:    { icon: "🧦", name: "Sammalsukat",   desc: "Osuma ohentaa sammalta kaksi kerrosta.", max: 1 },
+  kaato:    { icon: "🐻", name: "Karhunkaato",   desc: "Joka etappi alkaa karhunkäpälä laudalla.", max: 2 },
+  reppu:    { icon: "🎒", name: "Reppu",         desc: "Sadonkorjuu muuntaa +6 siirtoa enemmän.", max: 2 },
+  vaskooli: { icon: "🥇", name: "Kultavaskooli", desc: "Erikoispalan synnystä +100 pistettä.", max: 2 },
+  taky:     { icon: "🧺", name: "Täkykori",      desc: "Korit kerätään jo yhtä riviä ylempää.", max: 2 }
+};
+const CURSES = {
+  halla:  { icon: "❄️", name: "Hallanhenki",  desc: "+3 siirtoa joka etapilla – mutta neljä palaa alkaa jäässä." },
+  ahneus: { icon: "🪙", name: "Ahneus",       desc: "Pisteet ×1,5 – mutta poimintatavoitteet +25 %." },
+  rame:   { icon: "🌫️", name: "Rämeen kutsu", desc: "Sadonkorjuu +12 muunnosta – mutta sammal leviää aina." }
+};
+const AMULET = { icon: "⚡", name: "Ukonvaaja", desc: "Suojaa yhdeltä epäonnistumiselta: etappi alkaa alusta." };
+
+/* Polunhaarojen minipelit. Uusi minipeli = uusi merkintä tähän +
+   start-funktio, joka kutsuu lopuksi onDone(portit). */
+const MINIGAMES = {
+  kapylintu: {
+    icon: "🐦",
+    name: "Käpylintu",
+    desc: "Lennä tiaisena kuusikon halki. 5 porttia: +500 p · 10: varuste · 15: Ukonvaaja.",
+    start: onDone => startKapylintu(onDone)
+  },
+  suohyppely: {
+    icon: "🐸",
+    name: "Suohyppely",
+    desc: "Loiki mättäiltä tukeille. 5 riviä: +500 p · 10: varuste · 15: Ukonvaaja.",
+    start: onDone => startSuohyppely(onDone)
+  },
+  ahkio: {
+    icon: "🛷",
+    name: "Ahkio",
+    desc: "Laske rinnettä porttien läpi. 5 porttia: +500 p · 10: varuste · 15: Ukonvaaja.",
+    start: onDone => startAhkio(onDone)
+  }
+};
+
+/* Tuntemattomat esineet: vaikutus paljastuu vasta laukeamishetkellä */
+/* Hahmot: yksi auki alusta, kaksi avataan pelaamalla */
+const CHARS = {
+  poimija: { icon: "🧺", name: "Poimija",
+    power: "Sadonkorjuu +4 muunnosta · aloitus ⚡ Ukonvaajalla",
+    unlock: null },
+  tietaja: { icon: "🔮", name: "Tietäjä",
+    power: "Näkee pomon 2 seuraavaa iskua · tunnistaa ❓-esineet heti",
+    unlock: "Avautuu: pääse toiseen korpeen" },
+  kaataja: { icon: "🗡️", name: "Karhunkaataja",
+    power: "Pomovahinko +25 % · 🔪 Puukko mukana · kentät −2 siirtoa",
+    unlock: "Avautuu: läpäise vaellus" }
+};
+
+/* Aitan valikoima: pysyvät, eväät (kertakäyttö) ja hahmonkehitys */
+const AITTA_GOODS = {
+  perm: [
+    { id: "kori",   icon: "🧺", name: "Vankempi kori",  desc: "Sadonkorjuu muuntaa +2 siirtoa.", price: 450 },
+    { id: "kartta", icon: "🗺️", name: "Retkikartta",    desc: "Kohtaamisia osuu polulle useammin.", price: 600 },
+    { id: "evaat",  icon: "🥯", name: "Emännän eväät",  desc: "Joka korven ensimmäinen kenttä +3 siirtoa.", price: 500 },
+    { id: "avain",  icon: "🗝️", name: "Aitan avain",    desc: "Marjasaalis Aittaan +20 %.", price: 750 }
+  ],
+  once: [
+    { id: "vaaja",  icon: "⚡", name: "Ukonvaaja matkaan", desc: "Seuraava vaellus alkaa +1 vaajalla.", price: 200 },
+    { id: "kontti", icon: "🎒", name: "Tuohikontti",       desc: "Seuraava vaellus alkaa satunnaisella varusteella.", price: 160 },
+    { id: "kaaro",  icon: "❓", name: "Kääro",             desc: "Seuraava vaellus alkaa tuntemattomalla esineellä.", price: 180 }
+  ],
+  hero: [
+    { id: "poimija2", char: "poimija", icon: "🧺", name: "Poimijan taito II", desc: "Aloitusvaajoja kaksi.", price: 900 },
+    { id: "tietaja2", char: "tietaja", icon: "🔮", name: "Tietäjän taito II", desc: "Pomot aloittavat 10 % heikompina.", price: 900 },
+    { id: "kaataja2", char: "kaataja", icon: "🗡️", name: "Kaatajan taito II", desc: "Pomovahinko +40 %.", price: 900 }
+  ]
+};
+
+const MYSTERY_ITEMS = {
+  karhuntalja:  { icon: "🐻", name: "Karhuntalja",  reveal: "vahinko +50 % tässä taistelussa!" },
+  hiidenhammas: { icon: "🦷", name: "Hiidenhammas", reveal: "pomo aloittaa heikentyneenä!" },
+  ukonkivi:     { icon: "🪨", name: "Ukonkivi",     reveal: "kivi murskautuu ja pelastaa sinut!" },
+  evaskaary:    { icon: "🧆", name: "Eväskääry",    reveal: "+3 siirtoa tähän kenttään!" },
+  tervaskanto:  { icon: "🪵", name: "Tervaskanto",  reveal: "pomon ensimmäinen isku hukkaa!" },
+  noidanrumpu:  { icon: "🥁", name: "Noidanrumpu",  reveal: "+4 siirtoa tähän taisteluun!" }
+};
+
+const MOSS_ICON =
+  `<svg viewBox="0 0 48 48" aria-label="sammal"><rect x="6" y="6" width="36" height="36" rx="10" fill="#4a6b3a"/>` +
+  `<circle cx="16" cy="18" r="6" fill="#5c8046" opacity=".8"/><circle cx="30" cy="16" r="5" fill="#6d9552" opacity=".8"/>` +
+  `<circle cx="22" cy="30" r="7" fill="#557a41" opacity=".85"/><circle cx="34" cy="30" r="5" fill="#69904f" opacity=".8"/>` +
+  `<circle cx="14" cy="33" r="4" fill="#6d9552" opacity=".75"/></svg>`;
+
+const ICE_ICON =
+  `<svg viewBox="0 0 48 48" aria-label="jää"><rect x="6" y="6" width="36" height="36" rx="10" fill="#8cbee6" opacity=".4"/>` +
+  `<rect x="7.5" y="7.5" width="33" height="33" rx="9" fill="none" stroke="#bfe0f5" stroke-width="3" opacity=".9"/>` +
+  `<path d="M24 13v22M15 18.5l18 11M33 18.5l-18 11" stroke="#7fb2d8" stroke-width="2.4" stroke-linecap="round"/></svg>`;
+
+/* =========================================================
+   Äänet – Web Audio -synteesi, ei äänitiedostoja
+   ========================================================= */
+
+const Sfx = (() => {
+  let ctx = null, master = null, noiseBuf = null, on = true;
+
+  /* Luo/herätä äänikonteksti – kutsuttava käyttäjän eleestä (selainrajoitus). */
+  function unlock(){
+    if (!ctx){
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return;
+      ctx = new AC();
+      master = ctx.createGain();
+      master.gain.value = 0.35;
+      master.connect(ctx.destination);
+      noiseBuf = ctx.createBuffer(1, Math.floor(ctx.sampleRate * 0.5), ctx.sampleRate);
+      const d = noiseBuf.getChannelData(0);
+      for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    }
+    if (ctx.state === "suspended") ctx.resume();
+    startMusic();
+  }
+
+  const ready = () => on && ctx && ctx.state === "running";
+
+  /* Oskillaattoripiippaus: taajuusliuku f0→f1, nopea attack, eksp. häivytys. */
+  function tone({ f0, f1 = 0, type = "sine", t = 0, a = 0.005, d = 0.15, peak = 0.3 }){
+    if (!ready()) return;
+    const t0 = ctx.currentTime + t;
+    const o = ctx.createOscillator();
+    o.type = type;
+    o.frequency.setValueAtTime(f0, t0);
+    if (f1) o.frequency.exponentialRampToValueAtTime(f1, t0 + a + d);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(peak, t0 + a);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + a + d);
+    o.connect(g).connect(master);
+    o.start(t0);
+    o.stop(t0 + a + d + 0.05);
+  }
+
+  /* Suodatettu kohinapurske (viuhahdukset, rasahdukset). */
+  function noise({ t = 0, a = 0.005, d = 0.2, peak = 0.25, fType = "lowpass", f0 = 1000, f1 = 0 }){
+    if (!ready()) return;
+    const t0 = ctx.currentTime + t;
+    const src = ctx.createBufferSource();
+    src.buffer = noiseBuf;
+    const f = ctx.createBiquadFilter();
+    f.type = fType;
+    f.frequency.setValueAtTime(f0, t0);
+    if (f1) f.frequency.exponentialRampToValueAtTime(f1, t0 + a + d);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(peak, t0 + a);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + a + d);
+    src.connect(f).connect(g).connect(master);
+    src.start(t0);
+    src.stop(t0 + a + d + 0.05);
+  }
+
+  /* Pentatoninen asteikko: ketjun poksahdukset nousevat aina harmonisesti. */
+  const PENTA = [0, 2, 4, 7, 9, 12, 14, 16];
+
+  /* ---------- Taustamusiikki: generatiivinen metsäambient ----------
+     Sama C-duuripentatoninen kuin tehosteissa, joten kaikki soi yhteen. */
+
+  let musicOn = true, musicStarted = false, musicBus = null;
+  let tension = false;
+
+  /* Aktien sävelmaailmat C-urkupisteen päällä:
+     Metsä C-duuripentatoninen · Suo A-mollipentatoninen, verkkaisempi
+     Pohjola avara G-duuripentatoninen, harva ja korkea */
+  const MOODS = [
+    { root: 261.63, iv: [0, 2, 4, 7, 9],  slow: 1,    fifth: 0.22 },
+    { root: 220.00, iv: [0, 3, 5, 7, 10], slow: 1.25, fifth: 0.12 },
+    { root: 392.00, iv: [0, 2, 4, 7, 9],  slow: 1.45, fifth: 0.18 }
+  ];
+  let mood = MOODS[0];
+
+  function startMusic(){
+    if (musicStarted || !ctx) return;
+    musicStarted = true;
+
+    musicBus = ctx.createGain();
+    musicBus.gain.value = musicOn ? 1 : 0;
+    musicBus.connect(ctx.destination);
+
+    // urkupistepohja: C3 + G3 + kevyesti viritetty kaksois-C, hidas hengitys
+    const pad = ctx.createGain();
+    pad.gain.value = 0.65; // LFO moduloi ±0.35
+    const padFilter = ctx.createBiquadFilter();
+    padFilter.type = "lowpass";
+    padFilter.frequency.value = 700;
+    pad.connect(padFilter).connect(musicBus);
+    [[130.81, 0.03], [196.0, 0.02], [131.5, 0.013]].forEach(([f, g]) => {
+      const o = ctx.createOscillator();
+      o.type = "sine";
+      o.frequency.value = f;
+      const og = ctx.createGain();
+      og.gain.value = g;
+      o.connect(og).connect(pad);
+      o.start();
+    });
+    const lfo = ctx.createOscillator();
+    lfo.frequency.value = 0.06;
+    const lfoDepth = ctx.createGain();
+    lfoDepth.gain.value = 0.35;
+    lfo.connect(lfoDepth).connect(pad.gain);
+    lfo.start();
+
+    // hiljainen tuuli: silmukoitua kohinaa hitaasti liikkuvan kaistanpäästön läpi
+    const wind = ctx.createBufferSource();
+    wind.buffer = noiseBuf;
+    wind.loop = true;
+    const windFilter = ctx.createBiquadFilter();
+    windFilter.type = "bandpass";
+    windFilter.frequency.value = 420;
+    windFilter.Q.value = 0.7;
+    const windLfo = ctx.createOscillator();
+    windLfo.frequency.value = 0.05;
+    const windLfoDepth = ctx.createGain();
+    windLfoDepth.gain.value = 160;
+    windLfo.connect(windLfoDepth).connect(windFilter.frequency);
+    const windGain = ctx.createGain();
+    windGain.gain.value = 0.016;
+    wind.connect(windFilter).connect(windGain).connect(musicBus);
+    wind.start();
+    windLfo.start();
+
+    scheduleNote();
+  }
+
+  /* pehmeä harppusävel musiikkiväylään */
+  function mtone(f, t){
+    const t0 = ctx.currentTime + t;
+    const o = ctx.createOscillator();
+    o.type = "sine";
+    o.frequency.value = f;
+    const g = ctx.createGain();
+    const peak = 0.03 + Math.random() * 0.025;
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(peak, t0 + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + 1.6);
+    o.connect(g).connect(musicBus);
+    o.start(t0);
+    o.stop(t0 + 1.7);
+  }
+
+  /* satunnaiset sävelet; Kirin loppukiri tihentää ja nostaa niitä */
+  function scheduleNote(){
+    const range = tension ? [900, 1900] : [1900 * mood.slow, 4200 * mood.slow];
+    const delay = range[0] + Math.random() * (range[1] - range[0]);
+    setTimeout(() => {
+      if (musicOn && ctx && ctx.state === "running" && !document.hidden){
+        const octs = tension ? [1, 2] : [0, 1, 2];
+        const f = mood.root *
+          Math.pow(2, mood.iv[Math.floor(Math.random() * mood.iv.length)] / 12) *
+          Math.pow(2, octs[Math.floor(Math.random() * octs.length)]);
+        mtone(f, 0);
+        if (Math.random() < mood.fifth) mtone(f * 1.5, 0.18); // kvintti perään
+      }
+      scheduleNote();
+    }, delay);
+  }
+
+  return {
+    unlock,
+    toggle(){ on = !on; return on; },
+    musicToggle(){
+      musicOn = !musicOn;
+      if (musicBus){
+        const t0 = ctx.currentTime;
+        musicBus.gain.cancelScheduledValues(t0);
+        musicBus.gain.setValueAtTime(musicBus.gain.value, t0);
+        musicBus.gain.linearRampToValueAtTime(musicOn ? 1 : 0, t0 + 0.6);
+      }
+      return musicOn;
+    },
+    setTension(t){ tension = t; },
+    setMood(act){ mood = MOODS[Math.min(2, Math.max(0, act - 1))]; },
+    swap(){ tone({ f0: 700, f1: 480, type: "triangle", d: .07, peak: .22 }); },
+    invalid(){
+      tone({ f0: 170, type: "square", d: .07, peak: .12 });
+      tone({ f0: 145, type: "square", t: .09, d: .09, peak: .12 });
+    },
+    select(){ tone({ f0: 950, d: .035, peak: .07 }); },
+    pop(chain, n){
+      const f = 523 * Math.pow(2, PENTA[Math.min(chain - 1, PENTA.length - 1)] / 12);
+      tone({ f0: f * 1.3, f1: f * 0.7, d: .13, peak: .28 + Math.min(.15, n * .008) });
+      noise({ d: .05, peak: .1, f0: 3000, fType: "highpass" });
+    },
+    born(){
+      tone({ f0: 880, d: .12, peak: .18 });
+      tone({ f0: 1175, t: .08, d: .16, peak: .18 });
+    },
+    bornWild(){
+      [659, 880, 1109, 1319].forEach((f, i) => tone({ f0: f, t: i * .07, d: .2, peak: .18 }));
+    },
+    beam(){ noise({ d: .25, peak: .22, f0: 500, f1: 4500, fType: "bandpass" }); },
+    boom(){
+      tone({ f0: 150, f1: 45, d: .35, peak: .45 });
+      noise({ d: .25, peak: .28, f0: 400 });
+    },
+    bigBoom(){
+      tone({ f0: 110, f1: 32, d: .5, peak: .5 });
+      tone({ f0: 220, f1: 60, t: .06, d: .4, peak: .25 });
+      noise({ d: .4, peak: .32, f0: 300 });
+    },
+    flashWild(){
+      tone({ f0: 400, f1: 1600, d: .35, peak: .22 });
+      tone({ f0: 800, f1: 3200, t: .05, d: .3, peak: .1 });
+    },
+    timePlus(){
+      tone({ f0: 1200, type: "square", d: .05, peak: .07 });
+      tone({ f0: 1600, type: "square", t: .06, d: .07, peak: .07 });
+    },
+    tick(){ tone({ f0: 1000, d: .03, peak: .09 }); },
+    crack(){
+      noise({ d: .09, peak: .28, f0: 2500, fType: "highpass" });
+      tone({ f0: 1400, f1: 900, d: .06, peak: .12 });
+    },
+    freeze(){
+      tone({ f0: 2200, f1: 700, d: .3, peak: .18 });
+      noise({ d: .25, peak: .14, f0: 4500, fType: "highpass" });
+    },
+    hurt(){
+      tone({ f0: 220, f1: 120, type: "square", d: .12, peak: .18 });
+    },
+    dropHome(){
+      tone({ f0: 340, f1: 300, type: "triangle", d: .1, peak: .3 });
+      tone({ f0: 523, t: .09, d: .16, peak: .2 });
+      tone({ f0: 784, t: .18, d: .22, peak: .2 });
+    },
+    mossGrow(){ noise({ d: .22, peak: .16, f0: 240 }); },
+    shuffle(){ noise({ d: .3, peak: .13, f0: 1800, fType: "bandpass" }); },
+    gameOver(){
+      [523, 392, 311].forEach((f, i) => tone({ f0: f, t: i * .18, d: .28, peak: .22, type: "triangle" }));
+    },
+    fanfare(){
+      [523, 659, 784, 1047].forEach((f, i) => tone({ f0: f, t: i * .12, d: .3, peak: .22, type: "triangle" }));
+    }
+  };
+})();
+
+/* =========================================================
+   --- LOGIC ---  (puhtaat funktiot, ei DOM-riippuvuuksia)
+   ========================================================= */
+
+/* erikoispalatyypit */
+const S_NONE = 0, S_ROW = 1, S_COL = 2, S_BOMB = 3, S_WILD = 4;
+/* tyyppi -1 = kultakäpy (ei marjatyyppiä, ei muodosta sarjoja) */
+const T_WILD = -1;
+/* tyyppi -2 = käpykori (pudotustavoite): ei muodosta sarjoja, ei tuhoudu,
+   putoaa painovoiman mukana ja kerätään, kun se saavuttaa pohjarivin */
+const T_DROP = -2;
+
+function randType(){ return Math.floor(Math.random() * NTYPES); }
+
+const keyOf = (r, c) => r + "," + c;
+const unkey = k => k.split(",").map(Number);
+
+/* Kaikki 3+ sarjat suuntineen: [{dir:'h'|'v', len, cells:["r,c",...]}] */
+function findRuns(types){
+  const runs = [];
+  const isBerry = t => t !== null && t >= 0;
+  for (let r = 0; r < ROWS; r++){
+    let run = 1;
+    for (let c = 1; c <= COLS; c++){
+      if (c < COLS && isBerry(types[r][c]) && types[r][c] === types[r][c-1]) run++;
+      else {
+        if (run >= 3 && isBerry(types[r][c-1])){
+          const cells = [];
+          for (let k = c - run; k < c; k++) cells.push(keyOf(r, k));
+          runs.push({ dir:"h", len:run, cells });
+        }
+        run = 1;
+      }
+    }
+  }
+  for (let c = 0; c < COLS; c++){
+    let run = 1;
+    for (let r = 1; r <= ROWS; r++){
+      if (r < ROWS && isBerry(types[r][c]) && types[r][c] === types[r-1][c]) run++;
+      else {
+        if (run >= 3 && isBerry(types[r-1][c])){
+          const cells = [];
+          for (let k = r - run; k < r; k++) cells.push(keyOf(k, c));
+          runs.push({ dir:"v", len:run, cells });
+        }
+        run = 1;
+      }
+    }
+  }
+  return runs;
+}
+
+/* Joukko kaikista sarjasoluista (vanha rajapinta säilyy). */
+function findMatches(types){
+  const out = new Set();
+  for (const run of findRuns(types))
+    for (const k of run.cells) out.add(k);
+  return out;
+}
+
+function swapTypes(types, r1, c1, r2, c2){
+  const t = types[r1][c1];
+  types[r1][c1] = types[r2][c2];
+  types[r2][c2] = t;
+}
+
+function swapMakesMatch(types, r1, c1, r2, c2){
+  swapTypes(types, r1, c1, r2, c2);
+  const ok = findMatches(types).size > 0;
+  swapTypes(types, r1, c1, r2, c2);
+  return ok;
+}
+
+/* Sallittu siirto: tavallinen sarjavaihto, kultakäpy minkä tahansa viereen
+   TAI kaksi vierekkäistä yhdistettävää erikoispalaa. Jäätyneitä paloja
+   ei voi siirtää, joten ne eivät kelpaa siirron osapuoliksi. */
+function hasValidMove(types, specials, ices){
+  const combo = s => s === S_ROW || s === S_COL || s === S_BOMB;
+  const iced = (r, c) => !!(ices && ices[r][c]);
+  for (let r = 0; r < ROWS; r++){
+    for (let c = 0; c < COLS; c++){
+      if (iced(r, c)) continue;
+      if (specials && combo(specials[r][c])){
+        if ((c+1 < COLS && combo(specials[r][c+1]) && !iced(r, c+1)) ||
+            (r+1 < ROWS && combo(specials[r+1][c]) && !iced(r+1, c))) return true;
+      }
+      if (types[r][c] === T_WILD){
+        if ((c+1 < COLS && types[r][c+1] !== null && !iced(r, c+1)) ||
+            (c-1 >= 0 && types[r][c-1] !== null && !iced(r, c-1)) ||
+            (r+1 < ROWS && types[r+1][c] !== null && !iced(r+1, c)) ||
+            (r-1 >= 0 && types[r-1][c] !== null && !iced(r-1, c))) return true;
+        continue;
+      }
+      if (c + 1 < COLS && !iced(r, c+1) && swapMakesMatch(types, r, c, r, c + 1)) return true;
+      if (r + 1 < ROWS && !iced(r+1, c) && swapMakesMatch(types, r, c, r + 1, c)) return true;
+    }
+  }
+  return false;
+}
+
+/* Uusi lauta ilman valmiita sarjoja ja vähintään yhdellä siirrolla. */
+function generateTypes(){
+  for (let attempt = 0; attempt < 200; attempt++){
+    const types = [];
+    for (let r = 0; r < ROWS; r++){
+      types.push([]);
+      for (let c = 0; c < COLS; c++){
+        let t;
+        do { t = randType(); }
+        while (
+          (c >= 2 && types[r][c-1] === t && types[r][c-2] === t) ||
+          (r >= 2 && types[r-1][c] === t && types[r-2][c] === t)
+        );
+        types[r].push(t);
+      }
+    }
+    if (hasValidMove(types)) return types;
+  }
+  return null;
+}
+
+/* Suunnittelee poistot ja syntyvät erikoispalat sarjoista.
+   swapKeys: vaihdetut solut (etusijalla erikoispalan paikaksi) tai null. */
+function planClears(runs, swapKeys){
+  const clearSet = new Set();
+  for (const run of runs) for (const k of run.cells) clearSet.add(k);
+
+  const creations = [];
+  const used = new Set();
+  const pickPos = run => {
+    if (swapKeys)
+      for (const k of run.cells)
+        if (swapKeys.has(k) && !used.has(k)) return k;
+    const mid = run.cells[Math.floor(run.cells.length / 2)];
+    if (!used.has(mid)) return mid;
+    return run.cells.find(k => !used.has(k)) || null;
+  };
+
+  // 1) viiden sarja → kultakäpy
+  for (const run of runs){
+    if (run.len >= 5){
+      const k = pickPos(run);
+      if (k){ creations.push({ k, s: S_WILD }); used.add(k); run.consumed = true; }
+    }
+  }
+  // 2) L/T-risteys → karhunkäpälä
+  for (const h of runs){
+    if (h.dir !== "h" || h.consumed) continue;
+    for (const v of runs){
+      if (v.dir !== "v" || v.consumed) continue;
+      const shared = h.cells.find(k => v.cells.includes(k));
+      if (shared && !used.has(shared)){
+        creations.push({ k: shared, s: S_BOMB });
+        used.add(shared);
+        h.consumed = v.consumed = true;
+        break;
+      }
+    }
+  }
+  // 3) neljän sarja → harava (kaataa sarjaa vastaan kohtisuoran linjan)
+  for (const run of runs){
+    if (run.len === 4 && !run.consumed){
+      const k = pickPos(run);
+      if (k){ creations.push({ k, s: run.dir === "h" ? S_COL : S_ROW }); used.add(k); }
+    }
+  }
+  return { clearSet, creations };
+}
+
+/* Laajentaa poistojoukkoa laukeavilla erikoispaloilla (ketjureaktiot).
+   Palauttaa lauenneet erikoispalat tehosteita varten. */
+function expandSpecials(clearSet, types, specials){
+  const processed = new Set();
+  const triggers = [];
+  let again = true;
+  while (again){
+    again = false;
+    for (const key of Array.from(clearSet)){
+      if (processed.has(key)) continue;
+      processed.add(key);
+      const [r, c] = unkey(key);
+      const s = specials[r][c];
+      if (!s) continue;
+      triggers.push({ r, c, s });
+      const extra = [];
+      if (s === S_ROW){
+        for (let cc = 0; cc < COLS; cc++) extra.push(keyOf(r, cc));
+      } else if (s === S_COL){
+        for (let rr = 0; rr < ROWS; rr++) extra.push(keyOf(rr, c));
+      } else if (s === S_BOMB){
+        for (let rr = r-1; rr <= r+1; rr++)
+          for (let cc = c-1; cc <= c+1; cc++)
+            if (rr >= 0 && rr < ROWS && cc >= 0 && cc < COLS) extra.push(keyOf(rr, cc));
+      } else if (s === S_WILD){
+        // räjähdyksessä lauennut kultakäpy poimii satunnaisen lajin
+        const present = new Set();
+        for (let rr = 0; rr < ROWS; rr++)
+          for (let cc = 0; cc < COLS; cc++)
+            if (types[rr][cc] !== null && types[rr][cc] >= 0) present.add(types[rr][cc]);
+        if (present.size){
+          const arr = Array.from(present);
+          const pick = arr[Math.floor(Math.random() * arr.length)];
+          for (let rr = 0; rr < ROWS; rr++)
+            for (let cc = 0; cc < COLS; cc++)
+              if (types[rr][cc] === pick) extra.push(keyOf(rr, cc));
+        }
+      }
+      for (const k of extra){
+        const [rr, cc] = unkey(k);
+        if (types[rr][cc] !== null && !clearSet.has(k)){
+          clearSet.add(k);
+          again = true;
+        }
+      }
+    }
+  }
+  return triggers;
+}
+
+/* Kahden erikoispalan (harava/käpälä) yhdistelmän poistoalue.
+   Keskus (r,c) = kohderuutu, johon pelaaja vaihtoi. */
+function comboCells(s1, s2, r, c){
+  const cells = new Set();
+  const isLine = s => s === S_ROW || s === S_COL;
+  let kind, dir = null;
+  if (s1 === S_BOMB && s2 === S_BOMB){
+    kind = "iso"; // karhuemo: 5×5
+    for (let rr = r-2; rr <= r+2; rr++)
+      for (let cc = c-2; cc <= c+2; cc++)
+        if (rr >= 0 && rr < ROWS && cc >= 0 && cc < COLS) cells.add(keyOf(rr, cc));
+  } else if (isLine(s1) && isLine(s2)){
+    kind = "risti"; // koko rivi + koko sarake
+    for (let cc = 0; cc < COLS; cc++) cells.add(keyOf(r, cc));
+    for (let rr = 0; rr < ROWS; rr++) cells.add(keyOf(rr, c));
+  } else {
+    kind = "kolmois"; // käpälä + harava: kolme linjaa haravan suuntaan
+    dir = isLine(s1) ? s1 : s2;
+    if (dir === S_ROW){
+      for (let rr = r-1; rr <= r+1; rr++)
+        if (rr >= 0 && rr < ROWS)
+          for (let cc = 0; cc < COLS; cc++) cells.add(keyOf(rr, cc));
+    } else {
+      for (let cc = c-1; cc <= c+1; cc++)
+        if (cc >= 0 && cc < COLS)
+          for (let rr = 0; rr < ROWS; rr++) cells.add(keyOf(rr, cc));
+    }
+  }
+  return { cells, kind, dir };
+}
+
+/* Etsii yhden mahdollisen siirron vihjettä varten.
+   Suosii tavallista sarjavaihtoa (vaikein huomata); sitten
+   yhdistelmäpari, sitten kultakäpy. Jäätyneet palat ohitetaan.
+   Palauttaa [{r,c},{r,c}] tai null. */
+function findMove(types, specials, ices){
+  let combo = null, wild = null;
+  const comboS = s => s === S_ROW || s === S_COL || s === S_BOMB;
+  const iced = (r, c) => !!(ices && ices[r][c]);
+  for (let r = 0; r < ROWS; r++){
+    for (let c = 0; c < COLS; c++){
+      if (iced(r, c)) continue;
+      if (types[r][c] !== null && types[r][c] >= 0){
+        if (c+1 < COLS && !iced(r, c+1) && types[r][c+1] !== null && types[r][c+1] >= 0 &&
+            swapMakesMatch(types, r, c, r, c+1)) return [{r, c}, {r, c: c+1}];
+        if (r+1 < ROWS && !iced(r+1, c) && types[r+1][c] !== null && types[r+1][c] >= 0 &&
+            swapMakesMatch(types, r, c, r+1, c)) return [{r, c}, {r: r+1, c}];
+      }
+      if (!combo && specials && comboS(specials[r][c])){
+        if (c+1 < COLS && comboS(specials[r][c+1]) && !iced(r, c+1))      combo = [{r, c}, {r, c: c+1}];
+        else if (r+1 < ROWS && comboS(specials[r+1][c]) && !iced(r+1, c)) combo = [{r, c}, {r: r+1, c}];
+      }
+      if (!wild && types[r][c] === T_WILD){
+        if (c+1 < COLS && types[r][c+1] !== null && !iced(r, c+1))      wild = [{r, c}, {r, c: c+1}];
+        else if (c-1 >= 0 && types[r][c-1] !== null && !iced(r, c-1))   wild = [{r, c}, {r, c: c-1}];
+        else if (r+1 < ROWS && types[r+1][c] !== null && !iced(r+1, c)) wild = [{r, c}, {r: r+1, c}];
+        else if (r-1 >= 0 && types[r-1][c] !== null && !iced(r-1, c))   wild = [{r, c}, {r: r-1, c}];
+      }
+    }
+  }
+  return combo || wild;
+}
+
+
+/* Polunhaaraminipelien palkkioportaat: portit -> palkkiot.
+   Sama porrastus kaikille minipeleille, jotta riski on helppo hahmottaa. */
+function branchRewardTiers(gates){
+  return {
+    pot: gates * 20 + (gates >= 5 ? 400 : 0),
+    perk: gates >= 10,
+    amulet: gates >= 15
+  };
+}
+
+/* Pomotaistelun mitoitus: siirtobudjetti ja elämät syvyyden/aktin mukaan.
+   Vakiot kalibroitu bottisimulaatiolla (ks. taistelutestit). */
+function battleTuning(depth, mini){
+  const act = Math.ceil(depth / 10);
+  const moves = mini ? 18 : 22;
+  const dmgPerMove = 11;                       // botin mitattu keskivahinko/siirto
+  const hpFactor = mini ? 0.82 : 1.0;
+  const hp = Math.round(moves * dmgPerMove * hpFactor * (1 + 0.28 * (act - 1)));
+  return { moves, hp };
+}
+
+/* --- Vaellus-tila: proseduraalinen tasogeneraattori ---
+   Palauttaa tasospekin { moves, collect?, layout?, drops?, spread?, boss, name }.
+   Vaikeus skaalautuu syvyyden mukaan; joka 4. etappi on Hiisi (pomo). */
+function genRunLevel(depth, bossFlag){
+  const boss = bossFlag !== undefined ? bossFlag : depth % 4 === 0;
+  const act = Math.min(3, Math.ceil(depth / 10));
+  const dd = Math.min(depth, 14);
+  const rnd = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
+  const pick = arr => arr[Math.floor(Math.random() * arr.length)];
+
+  const grid = Array.from({ length: ROWS }, () => Array.from({ length: COLS }, () => "."));
+  const spec = { moves: 0, boss, name: "" };
+  let movesNeed = 0;
+
+  function mossPattern(layers){
+    const mShare = Math.min(0.5, 0.08 * dd);
+    const cellTarget = Math.max(4, Math.round(layers / (1 + mShare)));
+    const kind = pick(["patch", "band", "ring", "blobs"]);
+    const cells = [];
+    const addRect = (r0, c0, h, w) => {
+      for (let r = r0; r < r0 + h; r++)
+        for (let c = c0; c < c0 + w; c++)
+          if (r >= 1 && r < ROWS - 1 && c >= 0 && c < COLS) cells.push(r + "," + c);
+    };
+    if (kind === "patch"){
+      const h = rnd(2, 4), w = Math.max(2, Math.min(6, Math.ceil(cellTarget / h)));
+      addRect(rnd(1, ROWS - 1 - h), rnd(1, COLS - 1 - w), h, w);
+    } else if (kind === "band"){
+      const h = cellTarget > 12 ? 2 : 1;
+      addRect(rnd(1, ROWS - 1 - h), 1, h, 6);
+    } else if (kind === "ring"){
+      const s = rnd(4, 6);
+      const r0 = rnd(1, Math.max(1, ROWS - 1 - s)), c0 = rnd(1, COLS - 1 - s);
+      addRect(r0, c0, 1, s); addRect(r0 + s - 1, c0, 1, s);
+      addRect(r0 + 1, c0, s - 2, 1); addRect(r0 + 1, c0 + s - 1, s - 2, 1);
+    } else {
+      const h = rnd(2, 3), w = rnd(2, 3);
+      addRect(rnd(1, 3), rnd(1, 2), h, w);
+      addRect(rnd(4, ROWS - 1 - h), rnd(4, COLS - 1 - w), h, w);
+    }
+    const uniq = [...new Set(cells)].slice(0, cellTarget);
+    for (let i = uniq.length - 1; i > 0; i--){
+      const j = Math.floor(Math.random() * (i + 1));
+      [uniq[i], uniq[j]] = [uniq[j], uniq[i]];
+    }
+    const extra = Math.max(0, Math.min(uniq.length, layers - uniq.length));
+    uniq.forEach((k, i) => {
+      const [r, c] = k.split(",").map(Number);
+      grid[r][c] = i < extra ? "M" : "m";
+    });
+    return uniq.length + extra;
+  }
+
+  function addCollect(scale){
+    const nTypes = dd >= 3 && Math.random() < 0.5 ? 2 : 1;
+    const total = Math.round((12 + 3 * dd) * scale);
+    spec.collect = spec.collect || {};
+    const used = new Set(Object.keys(spec.collect));
+    for (let i = 0; i < nTypes; i++){
+      let t, g = 0;
+      do { t = rnd(0, NTYPES - 1); } while (used.has(String(t)) && g++ < 20);
+      used.add(String(t));
+      spec.collect[t] = Math.max(6, Math.round(total / nTypes));
+    }
+    movesNeed += 12 + 0.5 * total;
+  }
+  function addMoss(scale){
+    const layers = Math.min(32, Math.round((9 + 2.2 * dd) * scale));
+    const real = mossPattern(layers);
+    movesNeed += 9 + 0.75 * real;
+  }
+  function addIce(){
+    const n = rnd(2, Math.min(8, 2 + dd));
+    let placed = 0, g = 0;
+    while (placed < n && g++ < 100){
+      const r = rnd(0, ROWS - 1), c = rnd(0, COLS - 1);
+      if (grid[r][c] === "."){ grid[r][c] = "j"; placed++; }
+    }
+    movesNeed += placed * 0.7;
+  }
+  function addDrops(n){
+    spec.drops = (spec.drops || 0) + n;
+    movesNeed += 10 * n;
+  }
+
+  if (boss){
+    spec.name = "Hiisi";
+    addCollect(1.25);
+    addMoss(1.1);
+    if (dd >= 6){ if (Math.random() < 0.5) addDrops(1); else spec.spread = true; }
+    if (act >= 2) addIce();
+    movesNeed = movesNeed * 0.80; // pomo: yhdistetyt tavoitteet jakavat poimintoja, mutta ei armoa
+  } else {
+    const pool = ["collect"];
+    if (dd >= 2) pool.push("moss");
+    if (dd >= 4) pool.push("mixed");
+    if (dd >= 5) pool.push("drops");
+    const cls = pick(pool);
+    if (cls === "collect"){
+      spec.name = "Marjareissu";
+      addCollect(1);
+      if (act >= 2 && Math.random() < 0.4) addIce();
+    } else if (cls === "moss"){
+      spec.name = "Sammalikko";
+      addMoss(1);
+      if (act >= 2 && Math.random() < 0.3) addIce();
+      if (dd >= 6 && Math.random() < 0.3) spec.spread = true;
+    } else if (cls === "mixed"){
+      spec.name = "Kangasmaasto";
+      addCollect(0.65);
+      addMoss(0.65);
+      movesNeed *= 0.8;
+      if (act >= 2 && Math.random() < 0.3) addIce();
+    } else {
+      spec.name = "Korinkanto";
+      addDrops(dd >= 9 ? 2 : 1);
+      if (Math.random() < 0.5){ addCollect(0.5); movesNeed *= 0.85; }
+    }
+  }
+  // Suo: usva peittää paloja; Pohjola: pyry jäädyttää kesken kentän
+  if (act >= 2 && Math.random() < 0.55){
+    let n = 3 + Math.floor(Math.random() * 4), g = 0;
+    while (n > 0 && g++ < 100){
+      const r = Math.floor(Math.random() * ROWS), c = Math.floor(Math.random() * COLS);
+      if (grid[r][c] === "."){ grid[r][c] = "u"; n--; movesNeed += 0.3; }
+    }
+  }
+  if (act >= 3 && !boss && Math.random() < 0.45) spec.pyry = true;
+  // aktikiristys vastaa pelaajan varustekasvua: myöhemmät alueet vaativat tehokkuutta
+  const ACT_TIGHT = [1, 0.93, 0.86];
+  spec.moves = Math.max(14, Math.min(40,
+    Math.round(movesNeed * ACT_TIGHT[act - 1]) + 2 -
+    Math.floor(dd / 4) - Math.max(0, dd - 9)));
+  if (grid.some(row => row.some(ch => ch !== ".")))
+    spec.layout = grid.map(row => row.join(""));
+  return spec;
+}
+
+/* --- END LOGIC --- */
+
+/* =========================================================
+   Pysyvä tallennus: Aitta, ennätykset ja avaukset
+   Turvallinen adapteri: localStorage jos saatavilla (esim.
+   GitHub Pages / paikallinen tiedosto), muuten istuntomuisti.
+   ========================================================= */
+
+const Store = (() => {
+  const KEY = "poimuri-vaellus";
+  let mem = {};
+  let persistent = false;
+  try {
+    if (typeof localStorage !== "undefined"){
+      const raw = localStorage.getItem(KEY);
+      if (raw) mem = JSON.parse(raw) || {};
+      persistent = true;
+    }
+  } catch(e){ /* esikatselu tms: pysytään muistissa */ }
+  function flush(){
+    if (!persistent) return;
+    try { localStorage.setItem(KEY, JSON.stringify(mem)); } catch(e){}
+  }
+  return {
+    get: (k, d) => (k in mem ? mem[k] : d),
+    set: (k, v) => { mem[k] = v; flush(); },
+    persistent: () => persistent
+  };
+})();
+
+let aitta = Store.get("aitta", 0);          // marjavaranto vaellusten välillä
+let record = Store.get("record", null);      // { act, stage, score }
+let unlocks = Store.get("unlocks", { tietaja: false, kaataja: false });
+let owned = Store.get("owned", {});             // pysyvät ostot ja hahmonkehitys
+let provisions = Store.get("provisions", {});   // eväät seuraavalle vaellukselle
+let selectedChar = Store.get("char", "poimija");
+
+const permOwned = id => !!owned[id];
+const charIs = id => !!(RUN && RUN.char === id);
+const heroUpgraded = () => !!(RUN && owned[RUN.char + "2"]);
+
+function unlockChar(id){
+  if (unlocks[id]) return false;
+  unlocks[id] = true;
+  Store.set("unlocks", unlocks);
+  return true;
+}
+
+function bankBerries(n){
+  if (n <= 0) return 0;
+  // vain osa saaliista säilyy matkalta kotiin asti
+  const banked = Math.round(n / 4 * (permOwned("avain") ? 1.2 : 1));
+  aitta += banked;
+  Store.set("aitta", aitta);
+  return banked;
+}
+
+/* =========================================================
+   Pelitila ja DOM
+   ========================================================= */
+
+const boardEl  = document.getElementById("board");
+const selRing  = document.getElementById("selRing");
+const curRing  = document.getElementById("curRing");
+const bannerEl = document.getElementById("banner");
+const overlay  = document.getElementById("overlay");
+const ovTitle  = document.getElementById("ovTitle");
+const ovText   = document.getElementById("ovText");
+const ovBtn    = document.getElementById("ovBtn");
+const scoreEl  = document.getElementById("score");
+const movesEl  = document.getElementById("moves");
+const movesLabel   = document.getElementById("movesLabel");
+const movesStat    = document.getElementById("movesStat");
+const bestEl   = document.getElementById("best");
+const goalsEl  = document.getElementById("goals");
+const bestLabel = document.getElementById("bestLabel");
+const draftOverlay = document.getElementById("draftOverlay");
+const draftCards   = document.getElementById("draftCards");
+
+let types = [];          // types[r][c] = 0..5, -1 (kultakäpy) tai null
+let specials = [];       // specials[r][c] = S_NONE..S_WILD
+let tiles = [];          // tiles[r][c] = DOM-elementti
+let ices = emptyBool();  // jäätyneet palat (liikkuvat painovoiman mukana)
+let fog  = emptyBool();  // Suo: usvan peittämät palat – laji piilossa, osuma paljastaa
+let moss = emptyNum();   // Taival: sammalkerrokset per solu (0-2, eivät liiku)
+let mossLeft = 0, mossTotal = 0;
+let collectGoals = {};   // Taival: { tyyppi: jäljellä }
+let dropLeft = 0, dropTotal = 0;        // käpykorit
+let mossHitThisTurn = false;            // leviävän sammalen ehto
+let RUN = null;                         // Vaellus-tilan ajotila
+let pyryCounter = 3;                    // Pohjolan lumipyryn tahti
+
+const objMode    = () => mode === "level" || mode === "run";
+const perkCount  = id => (mode === "run" && RUN ? (RUN.perks[id] || 0) : 0);
+const curseOn    = id => !!(mode === "run" && RUN && RUN.curses[id]);
+const activeSpec = () => RUN.spec;
+let tileSize = 0;
+let score = 0, moves = START_MOVES, longestChain = 1, specialsMade = 0;
+const mode = "run"; // peli on nyt puhdas Vaellus-roguelike
+let busy = false, gameOver = false;
+let selected = null;
+let cursor = { r: 3, c: 3 };
+
+
+const sleep = ms => new Promise(res => setTimeout(res, ms));
+const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const dur = ms => reduceMotion ? 30 : ms;
+
+function measure(){
+  tileSize = boardEl.clientWidth / COLS;
+}
+
+function place(el, r, c){
+  el.style.width  = tileSize + "px";
+  el.style.height = tileSize + "px";
+  el.style.transform = `translate(${c * tileSize}px, ${r * tileSize}px)`;
+}
+
+function buildCellBackgrounds(){
+  boardEl.querySelectorAll(".cellbg").forEach(e => e.remove());
+  const pad = Math.max(2, tileSize * 0.045);
+  for (let r = 0; r < ROWS; r++){
+    for (let c = 0; c < COLS; c++){
+      const d = document.createElement("div");
+      d.className = "cellbg" + ((r + c) % 2 ? " alt" : "");
+      d.style.left   = (c * tileSize + pad) + "px";
+      d.style.top    = (r * tileSize + pad) + "px";
+      d.style.width  = (tileSize - pad * 2) + "px";
+      d.style.height = (tileSize - pad * 2) + "px";
+      boardEl.insertBefore(d, boardEl.firstChild);
+    }
+  }
+}
+
+function decorateTile(el, t, s){
+  el.innerHTML = (t === T_WILD ? WILD_ICON : t === T_DROP ? DROP_ICON : ICONS[t]) + (BADGES[s] || "");
+  el.classList.toggle("sp",   s !== S_NONE);
+  el.classList.toggle("wild", s === S_WILD);
+}
+
+function makeTile(t, s, r, c){
+  const el = document.createElement("div");
+  el.className = "tile";
+  decorateTile(el, t, s);
+  if (r >= 0 && ices[r] && ices[r][c]) el.insertAdjacentHTML("beforeend", '<div class="ice"></div>');
+  if (r >= 0 && fog[r] && fog[r][c]) el.insertAdjacentHTML("beforeend", '<div class="fog"></div>');
+  place(el, r, c);
+  boardEl.appendChild(el);
+  return el;
+}
+
+function rebuildBoardDOM(){
+  boardEl.querySelectorAll(".tile").forEach(e => e.remove());
+  tiles = [];
+  for (let r = 0; r < ROWS; r++){
+    tiles.push([]);
+    for (let c = 0; c < COLS; c++){
+      tiles[r].push(makeTile(types[r][c], specials[r][c], r, c));
+    }
+  }
+}
+
+function updateStats(){
+  scoreEl.textContent = RUN ? RUN.score + score : score;
+  bestEl.textContent = RUN ? RUN.act + "· " + RUN.stage + "/10" : "–";
+  movesEl.textContent = moves;
+  movesEl.classList.toggle("moves-low", moves <= 5 && !gameOver);
+}
+
+function showBanner(text){
+  bannerEl.textContent = text;
+  bannerEl.classList.remove("show");
+  void bannerEl.offsetWidth;
+  bannerEl.classList.add("show");
+}
+
+function setSelected(sel){
+  selected = sel;
+  if (!sel){ selRing.style.display = "none"; return; }
+  const pad = tileSize * 0.03;
+  selRing.style.display = "block";
+  selRing.style.left   = (sel.c * tileSize + pad) + "px";
+  selRing.style.top    = (sel.r * tileSize + pad) + "px";
+  selRing.style.width  = (tileSize - pad * 2) + "px";
+  selRing.style.height = (tileSize - pad * 2) + "px";
+}
+
+function updateCursorRing(){
+  const pad = tileSize * 0.08;
+  curRing.style.left   = (cursor.c * tileSize + pad) + "px";
+  curRing.style.top    = (cursor.r * tileSize + pad) + "px";
+  curRing.style.width  = (tileSize - pad * 2) + "px";
+  curRing.style.height = (tileSize - pad * 2) + "px";
+}
+
+/* ---------- Vihje ---------- */
+
+const HINT_DELAY = 5000;
+let hintTimer = null;
+
+function resetIdle(){
+  clearTimeout(hintTimer);
+  boardEl.querySelectorAll(".tile.hint").forEach(e => e.classList.remove("hint"));
+  if (gameOver) return;
+  hintTimer = setTimeout(showHint, HINT_DELAY);
+}
+
+function showHint(){
+  if (busy || gameOver){ resetIdle(); return; }
+  const mv = findMove(types, specials, ices);
+  if (!mv) return;
+  for (const cell of mv){
+    const el = tiles[cell.r][cell.c];
+    if (el){
+      el.classList.add("hint");
+      setTimeout(() => el.classList.remove("hint"), 1700);
+    }
+  }
+  // näytä uudelleen, jos pelaaja ei vieläkään toimi
+  hintTimer = setTimeout(showHint, HINT_DELAY);
+}
+
+/* ---------- Tehosteet ---------- */
+
+function spawnEffect(s, r, c){
+  const d = document.createElement("div");
+  if (s === S_ROW){
+    d.className = "fx beam-h";
+    d.style.top = (r * tileSize) + "px";
+    d.style.height = tileSize + "px";
+  } else if (s === S_COL){
+    d.className = "fx beam-v";
+    d.style.left = (c * tileSize) + "px";
+    d.style.width = tileSize + "px";
+  } else if (s === S_BOMB){
+    d.className = "fx boom";
+    const size = tileSize * 3;
+    d.style.width = d.style.height = size + "px";
+    d.style.left = ((c + 0.5) * tileSize - size / 2) + "px";
+    d.style.top  = ((r + 0.5) * tileSize - size / 2) + "px";
+  } else {
+    d.className = "fx flash";
+  }
+  boardEl.appendChild(d);
+  setTimeout(() => d.remove(), 700);
+}
+
+function spawnComboEffect(combo, r, c){
+  if (combo.kind === "risti"){
+    spawnEffect(S_ROW, r, c);
+    spawnEffect(S_COL, r, c);
+  } else if (combo.kind === "kolmois"){
+    if (combo.dir === S_ROW){
+      for (let rr = r-1; rr <= r+1; rr++)
+        if (rr >= 0 && rr < ROWS) spawnEffect(S_ROW, rr, c);
+    } else {
+      for (let cc = c-1; cc <= c+1; cc++)
+        if (cc >= 0 && cc < COLS) spawnEffect(S_COL, r, cc);
+    }
+  } else {
+    // karhuemo: 5×5-räjähdys
+    const d = document.createElement("div");
+    d.className = "fx boom";
+    const size = tileSize * 5;
+    d.style.width = d.style.height = size + "px";
+    d.style.left = ((c + 0.5) * tileSize - size / 2) + "px";
+    d.style.top  = ((r + 0.5) * tileSize - size / 2) + "px";
+    boardEl.appendChild(d);
+    setTimeout(() => d.remove(), 700);
+  }
+}
+
+/* =========================================================
+   Vaihto ja kaskadit
+   ========================================================= */
+
+function swapModel(a, b){
+  swapTypes(types, a.r, a.c, b.r, b.c);
+  const s = specials[a.r][a.c];
+  specials[a.r][a.c] = specials[b.r][b.c];
+  specials[b.r][b.c] = s;
+  const el = tiles[a.r][a.c];
+  tiles[a.r][a.c] = tiles[b.r][b.c];
+  tiles[b.r][b.c] = el;
+}
+
+async function trySwap(a, b){
+  if (busy || gameOver) return;
+  if (Math.abs(a.r - b.r) + Math.abs(a.c - b.c) !== 1) return;
+  if (ices[a.r][a.c] || ices[b.r][b.c]){
+    denyIce(ices[a.r][a.c] ? a : b);
+    return;
+  }
+  busy = true;
+  setSelected(null);
+  mossHitThisTurn = false;
+
+  const aWild = specials[a.r][a.c] === S_WILD;
+  const bWild = specials[b.r][b.c] === S_WILD;
+
+  const elA = tiles[a.r][a.c], elB = tiles[b.r][b.c];
+  place(elA, b.r, b.c);
+  place(elB, a.r, a.c);
+  await sleep(dur(230));
+
+  if (aWild || bWild){
+    // kultakäpy: aina pätevä siirto
+    Sfx.swap();
+    swapModel(a, b);
+    moves--;
+    updateStats();
+
+    const set = new Set();
+    if (aWild && bWild){
+      showBanner("Koko metsä!");
+      for (let r = 0; r < ROWS; r++)
+        for (let c = 0; c < COLS; c++)
+          if (types[r][c] !== null) set.add(keyOf(r, c));
+    } else {
+      const wildPos  = aWild ? b : a;   // käpy on nyt vaihdon jälkeen täällä
+      const berryPos = aWild ? a : b;
+      const t = types[berryPos.r][berryPos.c];
+      set.add(keyOf(wildPos.r, wildPos.c));
+      if (t !== null && t >= 0){
+        for (let r = 0; r < ROWS; r++)
+          for (let c = 0; c < COLS; c++)
+            if (types[r][c] === t) set.add(keyOf(r, c));
+      } else {
+        set.add(keyOf(berryPos.r, berryPos.c));
+      }
+    }
+    spawnEffect(S_WILD, 0, 0);
+    Sfx.flashWild();
+    await resolveCascades(set, null);
+    await afterTurn();
+    busy = false;
+    resetIdle();
+    return;
+  }
+
+  const sA = specials[a.r][a.c], sB = specials[b.r][b.c];
+  if (sA !== S_NONE && sB !== S_NONE){
+    // erikoispalojen yhdistelmä: aina pätevä siirto
+    Sfx.swap();
+    swapModel(a, b);
+    moves--;
+
+    const combo = comboCells(sA, sB, b.r, b.c);
+    // molemmat kuluvat yhdistelmään eivätkä laukea enää erikseen
+    specials[a.r][a.c] = S_NONE;
+    specials[b.r][b.c] = S_NONE;
+    decorateTile(tiles[a.r][a.c], types[a.r][a.c], S_NONE);
+    decorateTile(tiles[b.r][b.c], types[b.r][b.c], S_NONE);
+
+    score += 100; // yhdistelmäbonus
+    updateStats();
+
+    if (combo.kind === "risti")        showBanner("Risti!");
+    else if (combo.kind === "kolmois") showBanner("Kolmoiskaato!");
+    else                               showBanner("Karhuemo!");
+    spawnComboEffect(combo, b.r, b.c);
+    if (combo.kind === "iso"){
+      Sfx.bigBoom();
+    } else {
+      const n = combo.kind === "risti" ? 2 : 3;
+      for (let i = 0; i < n; i++) setTimeout(() => Sfx.beam(), i * 80);
+    }
+
+    await resolveCascades(combo.cells, null);
+    await afterTurn();
+    busy = false;
+    resetIdle();
+    return;
+  }
+
+  if (swapMakesMatch(types, a.r, a.c, b.r, b.c)){
+    Sfx.swap();
+    swapModel(a, b);
+    moves--;
+    updateStats();
+    await resolveCascades(null, new Set([keyOf(a.r, a.c), keyOf(b.r, b.c)]));
+    await afterTurn();
+  } else {
+    Sfx.invalid();
+    place(elA, a.r, a.c);
+    place(elB, b.r, b.c);
+    await sleep(dur(230));
+  }
+  busy = false;
+  resetIdle();
+}
+
+async function resolveCascades(initialSet, swapKeys){
+  let chain = 0;
+  while (true){
+    let clearSet, creations = [];
+    if (initialSet){
+      clearSet = initialSet;
+      initialSet = null;
+    } else {
+      const runs = findRuns(types);
+      if (!runs.length) break;
+      const plan = planClears(runs, swapKeys);
+      clearSet = plan.clearSet;
+      creations = plan.creations;
+      // Vaellus: Puukko muuntaa haravat karhunkäpäliksi
+      if (perkCount("puukko"))
+        for (const cr of creations)
+          if (cr.s === S_ROW || cr.s === S_COL) cr.s = S_BOMB;
+    }
+    swapKeys = null;
+    chain++;
+    longestChain = Math.max(longestChain, chain);
+
+    // erikoispalojen ketjureaktiot
+    const triggers = expandSpecials(clearSet, types, specials);
+    for (const tr of triggers) spawnEffect(tr.s, tr.r, tr.c);
+
+    // syntyvät erikoispalat eivät tuhoudu vaan muuntuvat
+    for (const cr of creations) clearSet.delete(cr.k);
+
+    // Taival: jää imee osuman – kuori särkyy, pala säilyy
+    let iceBroken = 0;
+    let fogLifted = 0;
+    for (const key of Array.from(clearSet)){
+      const [r, c] = unkey(key);
+      if (types[r][c] === T_DROP){ clearSet.delete(key); continue; } // kori ei tuhoudu
+      if (fog[r][c]){
+        fog[r][c] = false;
+        fogLifted++;
+        clearSet.delete(key); // osuma kuluu usvan hälventämiseen
+        const el = tiles[r][c];
+        if (el){
+          const fe = el.querySelector(".fog");
+          if (fe) fe.remove();
+          el.classList.add("pop");
+          setTimeout(() => el.classList.remove("pop"), 300);
+        }
+        continue;
+      }
+      if (ices[r][c]){
+        if (!perkCount("virsut")) clearSet.delete(key); // virsuilla pala poimiutuu samalla
+        ices[r][c] = false;
+        iceBroken++;
+        const el = tiles[r][c];
+        if (el){
+          const ie = el.querySelector(".ice");
+          if (ie) ie.remove();
+          el.classList.add("deny");
+          setTimeout(() => el.classList.remove("deny"), 350);
+        }
+      }
+    }
+    if (iceBroken) Sfx.crack();
+
+    // Vaellus: Hunajapurkki korottaa ketjukerrointa, Kultavaskooli synteä
+    const chainMult = chain + (chain >= 2 ? perkCount("hunaja") : 0);
+    score += clearSet.size * 10 * chainMult +
+             creations.length * (50 + 100 * perkCount("vaskooli")) +
+             iceBroken * 20 + fogLifted * 15;
+    // Pomotaistelu: vahinko = poiminnat × ketju (sammal panssaroi solunsa)
+    if (BATTLE){
+      let armored = 0;
+      for (const key of clearSet){
+        const [r, c] = unkey(key);
+        if (moss[r][c] > 0) armored++;
+      }
+      dealBossDamage((clearSet.size - armored) * chainMult +
+                     creations.length * 25 + triggers.length * 15);
+    }
+    specialsMade += creations.length;
+
+
+    updateStats();
+
+    // banneri: erikoispala voittaa ketjukehut
+    const born = creations.map(cr => cr.s);
+    if (born.includes(S_WILD))      showBanner("Kultakäpy!");
+    else if (born.includes(S_BOMB)) showBanner("Karhunkäpälä!");
+    else if (born.length)           showBanner("Harava!");
+    else if (chain >= 2)            showBanner(PRAISE[Math.min(chain, PRAISE.length - 1)]);
+
+    // äänet: poksahdus nousee ketjun mukana, laukeamiset porrastettuna
+    Sfx.pop(chain, clearSet.size);
+    if (born.includes(S_WILD))     Sfx.bornWild();
+    else if (creations.length)     Sfx.born();
+    triggers.slice(0, 3).forEach((tr, i) => setTimeout(() => {
+      if (tr.s === S_BOMB)      Sfx.boom();
+      else if (tr.s === S_WILD) Sfx.flashWild();
+      else                      Sfx.beam();
+    }, i * 90));
+
+    // poksautus
+    for (const key of clearSet){
+      const [r, c] = unkey(key);
+      if (tiles[r][c]) tiles[r][c].classList.add("pop");
+    }
+    await sleep(dur(240));
+    for (const key of clearSet){
+      const [r, c] = unkey(key);
+      // Taival: poimintatavoitteet ja sammalen ohennus
+      const t = types[r][c];
+      if (t !== null && t >= 0){
+        if (collectGoals[t] > 0) collectGoals[t]--;
+        if (RUN) RUN.berries++; // jokainen poimittu marja kertyy Aittaan
+      }
+      if (moss[r][c] > 0){
+        const dec = Math.min(moss[r][c], 1 + perkCount("sukat"));
+        moss[r][c] -= dec;
+        mossLeft -= dec;
+        mossHitThisTurn = true;
+        updateMossEl(r, c);
+      }
+      if (tiles[r][c]){ tiles[r][c].remove(); tiles[r][c] = null; }
+      types[r][c] = null;
+      specials[r][c] = S_NONE;
+    }
+    if (objMode()) renderGoals();
+
+    // muunna syntyvät erikoispalat paikoilleen
+    for (const cr of creations){
+      const [r, c] = unkey(cr.k);
+      if (ices[r][c]){
+        ices[r][c] = false;
+        const ie = tiles[r][c] && tiles[r][c].querySelector(".ice");
+        if (ie) ie.remove();
+      }
+      if (cr.s === S_WILD) types[r][c] = T_WILD;
+      specials[r][c] = cr.s;
+      const el = tiles[r][c];
+      if (el){
+        decorateTile(el, types[r][c], cr.s);
+        el.classList.add("born");
+        setTimeout(() => el.classList.remove("born"), 450);
+      }
+    }
+
+    // painovoima + täyttö
+    dropAndRefill();
+    await sleep(dur(340));
+    boardEl.querySelectorAll(".tile.falling").forEach(e => e.classList.remove("falling"));
+    await collectDropsAtBottom();
+  }
+}
+
+/* Painovoima ja uusien palojen kylvö laudan yläpuolelta. */
+function dropAndRefill(){
+  for (let c = 0; c < COLS; c++){
+    let write = ROWS - 1;
+    for (let r = ROWS - 1; r >= 0; r--){
+      if (types[r][c] !== null){
+        if (write !== r){
+          types[write][c]    = types[r][c];
+          specials[write][c] = specials[r][c];
+          ices[write][c]     = ices[r][c];
+          fog[write][c]      = fog[r][c];
+          tiles[write][c]    = tiles[r][c];
+          types[r][c] = null;
+          specials[r][c] = S_NONE;
+          ices[r][c] = false;
+          fog[r][c] = false;
+          tiles[r][c] = null;
+          tiles[write][c].classList.add("falling");
+          place(tiles[write][c], write, c);
+        }
+        write--;
+      }
+    }
+    let spawn = 1;
+    for (let r = write; r >= 0; r--){
+      const t = randType();
+      types[r][c] = t;
+      specials[r][c] = S_NONE;
+      ices[r][c] = false;
+      fog[r][c] = false;
+      const el = makeTile(t, S_NONE, -spawn, c);
+      el.classList.add("falling");
+      tiles[r][c] = el;
+      void el.offsetWidth;
+      place(el, r, c);
+      spawn++;
+    }
+  }
+}
+
+/* Kerää pohjariville pudonneet käpykorit ja täyttää jättämänsä aukot. */
+async function collectDropsAtBottom(){
+  while (dropLeft > 0){
+    const thr = ROWS - 1 - Math.min(2, perkCount("taky")); // Täkykori laskee kynnystä
+    const hits = [];
+    for (let r = thr; r < ROWS; r++)
+      for (let c = 0; c < COLS; c++)
+        if (types[r][c] === T_DROP) hits.push({ r, c });
+    if (!hits.length) return;
+    Sfx.dropHome();
+    showBanner("Kori perillä!");
+    for (const h of hits){
+      dropLeft--;
+      score += 150;
+      if (tiles[h.r][h.c]) tiles[h.r][h.c].classList.add("pop");
+    }
+    updateStats();
+    renderGoals();
+    await sleep(dur(260));
+    for (const h of hits){
+      if (tiles[h.r][h.c]){ tiles[h.r][h.c].remove(); tiles[h.r][h.c] = null; }
+      types[h.r][h.c] = null;
+      specials[h.r][h.c] = S_NONE;
+      ices[h.r][h.c] = false;
+    }
+    dropAndRefill();
+    await sleep(dur(340));
+    boardEl.querySelectorAll(".tile.falling").forEach(e => e.classList.remove("falling"));
+  }
+}
+
+async function afterTurn(){
+  if (goalsComplete()){ await runLevelWin(); return; }
+  if (moves <= 0){ runLevelFail(); return; }
+  if (BATTLE){
+    BATTLE.counter--;
+    if (BATTLE.counter <= 0) await performBossAttack();
+    else renderBossBar();
+    if (moves <= 0){ runLevelFail(); return; } // ahmaisu saattoi syödä viimeisen
+  } else {
+    const doSpread = activeSpec().spread || (curseOn("rame") && mossTotal > 0);
+    if (doSpread && !mossHitThisTurn) spreadMoss();
+    if (activeSpec().pyry && --pyryCounter <= 0){
+      pyryCounter = 3;
+      showBanner("Pyry!");
+      Sfx.freeze();
+      let n = 2, g = 0;
+      while (n > 0 && g++ < 100){
+        const r = Math.floor(Math.random() * ROWS), c = Math.floor(Math.random() * COLS);
+        if (types[r][c] >= 0 && !ices[r][c] && !fog[r][c] && specials[r][c] === S_NONE){
+          ices[r][c] = true;
+          if (tiles[r][c]) tiles[r][c].insertAdjacentHTML("beforeend", '<div class="ice"></div>');
+          n--;
+        }
+      }
+      await sleep(dur(350));
+    }
+  }
+  if (!hasValidMove(types, specials, ices)){
+    showBanner("Ei siirtoja – sekoitetaan!");
+    await sleep(dur(900));
+    reshuffle();
+  }
+}
+
+function reshuffle(){
+  Sfx.shuffle();
+  const flat = [];
+  for (let r = 0; r < ROWS; r++)
+    for (let c = 0; c < COLS; c++)
+      flat.push({ t: types[r][c], s: specials[r][c], i: ices[r][c] });
+  for (let attempt = 0; attempt < 500; attempt++){
+    for (let i = flat.length - 1; i > 0; i--){
+      const j = Math.floor(Math.random() * (i + 1));
+      [flat[i], flat[j]] = [flat[j], flat[i]];
+    }
+    const tTest = [], sTest = [], iTest = [];
+    for (let r = 0; r < ROWS; r++){
+      tTest.push([]); sTest.push([]); iTest.push([]);
+      for (let c = 0; c < COLS; c++){
+        const f = flat[r * COLS + c];
+        tTest[r].push(f.t); sTest[r].push(f.s); iTest[r].push(f.i);
+      }
+    }
+    if (findMatches(tTest).size === 0 && hasValidMove(tTest, sTest, iTest)){
+      types = tTest;
+      specials = sTest;
+      ices = iTest;
+      rebuildBoardDOM();
+      return;
+    }
+  }
+  types = generateTypes();
+  specials = emptySpecials();
+  ices = emptyBool();
+  rebuildBoardDOM();
+}
+
+function emptySpecials(){
+  return Array.from({ length: ROWS }, () => Array.from({ length: COLS }, () => S_NONE));
+}
+
+/* =========================================================
+   Taival-tila: tasot, sammal ja jää
+   ========================================================= */
+
+function emptyBool(){ return Array.from({ length: ROWS }, () => Array.from({ length: COLS }, () => false)); }
+function emptyNum(){ return Array.from({ length: ROWS }, () => Array.from({ length: COLS }, () => 0)); }
+
+function parseLayout(rows){
+  ices = emptyBool();
+  fog  = emptyBool();
+  moss = emptyNum();
+  mossLeft = 0;
+  mossTotal = 0;
+  if (!rows) return;
+  for (let r = 0; r < ROWS; r++){
+    for (let c = 0; c < COLS; c++){
+      const ch = rows[r][c];
+      if (ch === "m")      moss[r][c] = 1;
+      else if (ch === "M") moss[r][c] = 2;
+      else if (ch === "j") ices[r][c] = true;
+      else if (ch === "u") fog[r][c] = true;
+      mossLeft += moss[r][c];
+    }
+  }
+  mossTotal = mossLeft;
+}
+
+let mossEls = [];
+function buildMossEls(){
+  boardEl.querySelectorAll(".mosscell").forEach(e => e.remove());
+  mossEls = Array.from({ length: ROWS }, () => Array.from({ length: COLS }, () => null));
+  const pad = Math.max(2, tileSize * 0.045);
+  for (let r = 0; r < ROWS; r++){
+    for (let c = 0; c < COLS; c++){
+      if (moss[r][c] > 0){
+        const d = document.createElement("div");
+        d.className = "mosscell" + (moss[r][c] === 2 ? " m2" : "");
+        d.style.left   = (c * tileSize + pad) + "px";
+        d.style.top    = (r * tileSize + pad) + "px";
+        d.style.width  = (tileSize - pad * 2) + "px";
+        d.style.height = (tileSize - pad * 2) + "px";
+        boardEl.insertBefore(d, selRing);
+        mossEls[r][c] = d;
+      }
+    }
+  }
+}
+
+function addMossCell(r, c){
+  const pad = Math.max(2, tileSize * 0.045);
+  const d = document.createElement("div");
+  d.className = "mosscell grow";
+  d.style.left   = (c * tileSize + pad) + "px";
+  d.style.top    = (r * tileSize + pad) + "px";
+  d.style.width  = (tileSize - pad * 2) + "px";
+  d.style.height = (tileSize - pad * 2) + "px";
+  boardEl.insertBefore(d, selRing);
+  mossEls[r][c] = d;
+  setTimeout(() => d.classList.remove("grow"), 550);
+}
+
+/* Leviävä sammal: jos vuoro ei poiminut sammalta, se valtaa viereisen solun.
+   Ehdokas painottuu soluihin, joilla on monta sammaloitunutta naapuria. */
+function spreadMoss(){
+  const cands = [];
+  for (let r = 0; r < ROWS; r++)
+    for (let c = 0; c < COLS; c++)
+      if (moss[r][c] > 0)
+        for (const [rr, cc] of [[r-1,c],[r+1,c],[r,c-1],[r,c+1]])
+          if (rr >= 0 && rr < ROWS && cc >= 0 && cc < COLS && moss[rr][cc] === 0)
+            cands.push(keyOf(rr, cc));
+  if (!cands.length) return;
+  const [r, c] = unkey(cands[Math.floor(Math.random() * cands.length)]);
+  moss[r][c] = 1;
+  mossLeft++;
+  mossTotal++;
+  addMossCell(r, c);
+  renderGoals();
+  showBanner("Sammal leviää!");
+  Sfx.mossGrow();
+}
+
+function updateMossEl(r, c){
+  const el = mossEls[r][c];
+  if (!el) return;
+  if (moss[r][c] <= 0){ el.remove(); mossEls[r][c] = null; }
+  else el.classList.remove("m2");
+}
+
+function goalsComplete(){
+  if (BATTLE) return BATTLE.hp <= 0;
+  if (mossLeft > 0) return false;
+  if (dropLeft > 0) return false;
+  for (const t in collectGoals) if (collectGoals[t] > 0) return false;
+  return true;
+}
+
+function renderGoals(){
+  if (!objMode()){ goalsEl.classList.add("hidden"); return; }
+  goalsEl.classList.remove("hidden");
+  let html = "";
+  for (const t in collectGoals){
+    const left = Math.max(0, collectGoals[t]);
+    html += `<span class="chip${left === 0 ? " done" : ""}"><span class="ci">${ICONS[t]}</span>${left === 0 ? "✓" : "×" + left}</span>`;
+  }
+  if (mossTotal > 0){
+    html += `<span class="chip${mossLeft <= 0 ? " done" : ""}"><span class="ci">${MOSS_ICON}</span>${mossLeft <= 0 ? "✓" : "×" + mossLeft}</span>`;
+  }
+  if (dropTotal > 0){
+    html += `<span class="chip${dropLeft <= 0 ? " done" : ""}"><span class="ci">${DROP_ICON}</span>${dropLeft <= 0 ? "✓" : "×" + dropLeft}</span>`;
+  }
+  goalsEl.innerHTML = html;
+}
+
+function denyIce(cell){
+  Sfx.invalid();
+  setSelected(null);
+  const el = tiles[cell.r][cell.c];
+  if (el){
+    el.classList.add("deny");
+    setTimeout(() => el.classList.remove("deny"), 350);
+  }
+}
+
+/* Sadonkorjuu: jäljellä olevat siirrot muuttuvat haravoiksi, jotka
+   laukeavat kertarysäyksellä – nopea läpäisy palkitaan näyttävästi. */
+async function harvestFinish(){
+  showBanner("Sadonkorjuu!");
+  Sfx.bornWild();
+  await sleep(dur(550));
+  const harvestCap = 12 + 6 * perkCount("reppu") + (curseOn("rame") ? 12 : 0) +
+    (charIs("poimija") ? 4 : 0) + (permOwned("kori") ? 2 : 0);
+  const toConvert = Math.min(moves, harvestCap);
+  let converted = 0;
+  while (converted < toConvert){
+    const cands = [];
+    for (let r = 0; r < ROWS; r++)
+      for (let c = 0; c < COLS; c++)
+        if (types[r][c] !== null && types[r][c] >= 0 &&
+            specials[r][c] === S_NONE && !ices[r][c])
+          cands.push({ r, c });
+    if (!cands.length) break;
+    const p = cands[Math.floor(Math.random() * cands.length)];
+    specials[p.r][p.c] = Math.random() < 0.5 ? S_ROW : S_COL;
+    decorateTile(tiles[p.r][p.c], types[p.r][p.c], specials[p.r][p.c]);
+    if (tiles[p.r][p.c]) tiles[p.r][p.c].classList.add("born");
+    Sfx.born();
+    converted++;
+    moves--;
+    updateStats();
+    await sleep(dur(140));
+  }
+  // katon yli jäävät siirrot pisteinä suoraan
+  score += Math.max(0, moves) * 30;
+  moves = 0;
+  updateStats();
+  await sleep(dur(350));
+  // laukaise laudan kaikki erikoispalat kerralla
+  const set = new Set();
+  for (let r = 0; r < ROWS; r++)
+    for (let c = 0; c < COLS; c++)
+      if (specials[r][c] !== S_NONE) set.add(keyOf(r, c));
+  if (set.size) await resolveCascades(set, null);
+}
+
+
+function restartFromOverlay(){
+  if (!RUN || RUN.finished){ showMainMenu(); return; }
+  newGame(); // Ukonvaaja-pelastus: sama kenttä alusta
+}
+
+/* =========================================================
+   Vaellus-tilan virta
+   ========================================================= */
+
+const bossbarEl = document.getElementById("bossbar");
+
+function renderBossBar(){
+  if (!BATTLE){ bossbarEl.classList.add("hidden"); return; }
+  bossbarEl.classList.remove("hidden");
+  bossbarEl.classList.toggle("enraged", BATTLE.enraged);
+  const info = ATTACK_INFO[BATTLE.next];
+  const pct = Math.max(0, BATTLE.hp / BATTLE.maxHp * 100);
+  const seer = charIs("tietaja") ? " → " + ATTACK_INFO[BATTLE.next2].icon : "";
+  bossbarEl.innerHTML =
+    `<div class="brow">` +
+    `<span class="bname">${BATTLE.enraged ? "🔥 " : ""}${BATTLE.name}</span>` +
+    `<span class="btele">${info.icon} ${info.label}${seer} · ${BATTLE.counter} siirron päästä</span>` +
+    `</div>` +
+    `<div class="btrack"><div class="bfill" style="width:${pct}%"></div>` +
+    `<span class="bnum">${Math.max(0, BATTLE.hp)} / ${BATTLE.maxHp}</span></div>`;
+}
+
+function dealBossDamage(dmg){
+  if (!BATTLE || dmg <= 0) return;
+  const charMult = charIs("kaataja") ? (heroUpgraded() ? 1.4 : 1.25) : 1;
+  dmg = Math.round(dmg * (BATTLE.dmgMult || 1) * charMult);
+  BATTLE.hp -= dmg;
+  Sfx.hurt();
+  const f = document.createElement("span");
+  f.className = "dmgfloat";
+  f.textContent = "−" + dmg;
+  f.style.color = "#e5b954";
+  bossbarEl.appendChild(f);
+  setTimeout(() => f.remove(), 950);
+  if (!BATTLE.enraged && !BATTLE.mini && BATTLE.hp <= BATTLE.maxHp / 2 && BATTLE.hp > 0){
+    BATTLE.enraged = true;
+    BATTLE.cadence = 1; // raivo: isku joka siirrolla
+    BATTLE.counter = Math.min(BATTLE.counter, 1);
+    boardEl.classList.add("enrage");
+    showBanner(BATTLE.name + " raivostuu!");
+    Sfx.boom();
+  }
+  renderBossBar();
+}
+
+async function performBossAttack(){
+  if (BATTLE.skipFirst){
+    BATTLE.skipFirst = false;
+    showBanner(BATTLE.name + " kompastuu tervaskantoon!");
+    Sfx.invalid();
+    BATTLE.counter = BATTLE.cadence;
+    BATTLE.next = BATTLE.next2;
+    BATTLE.next2 = BATTLE.attacks[Math.floor(Math.random() * BATTLE.attacks.length)];
+    renderBossBar();
+    await sleep(dur(400));
+    return;
+  }
+  const atk = BATTLE.next;
+  const info = ATTACK_INFO[atk];
+  const power = BATTLE.enraged ? 1 : 0;
+  showBanner(`${BATTLE.name}: ${info.icon} ${info.label}!`);
+  await sleep(dur(450));
+  if (atk === "freeze"){
+    Sfx.freeze();
+    let n = 2 + power, g = 0;
+    while (n > 0 && g++ < 100){
+      const r = Math.floor(Math.random() * ROWS), c = Math.floor(Math.random() * COLS);
+      if (types[r][c] >= 0 && !ices[r][c] && specials[r][c] === S_NONE){
+        ices[r][c] = true;
+        if (tiles[r][c]) tiles[r][c].insertAdjacentHTML("beforeend", '<div class="ice"></div>');
+        n--;
+      }
+    }
+  } else if (atk === "moss"){
+    Sfx.mossGrow();
+    let n = 3 + power, g = 0;
+    while (n > 0 && g++ < 100){
+      const r = Math.floor(Math.random() * ROWS), c = Math.floor(Math.random() * COLS);
+      if (moss[r][c] === 0){
+        moss[r][c] = 1;
+        mossLeft++; mossTotal++;
+        addMossCell(r, c);
+        n--;
+      }
+    }
+  } else if (atk === "steal"){
+    const sp = [];
+    for (let r = 0; r < ROWS; r++)
+      for (let c = 0; c < COLS; c++)
+        if (specials[r][c] !== S_NONE) sp.push({ r, c });
+    if (sp.length){
+      Sfx.crack();
+      const p = sp[Math.floor(Math.random() * sp.length)];
+      if (types[p.r][p.c] === T_WILD) types[p.r][p.c] = randType();
+      specials[p.r][p.c] = S_NONE;
+      if (tiles[p.r][p.c]) decorateTile(tiles[p.r][p.c], types[p.r][p.c], S_NONE);
+    } else {
+      moves = Math.max(0, moves - 1); // ei ryöstettävää: syö siirron
+      updateStats();
+    }
+    if (BATTLE.enraged){ moves = Math.max(0, moves - 1); updateStats(); }
+  } else if (atk === "eat"){
+    Sfx.invalid();
+    moves = Math.max(0, moves - 1); // kiinteä: raivon paine tulee iskutiheydestä
+    updateStats();
+  }
+  BATTLE.counter = BATTLE.cadence;
+  BATTLE.next = BATTLE.next2;
+  BATTLE.next2 = BATTLE.attacks[Math.floor(Math.random() * BATTLE.attacks.length)];
+  renderBossBar();
+  await sleep(dur(300));
+}
+
+const invOverlay = document.getElementById("invOverlay");
+const invBody    = document.getElementById("invBody");
+const invBtn     = document.getElementById("invBtn");
+const invBadge   = document.getElementById("invBadge");
+
+/* Repunappi tilastorivissä: ⚡-määrä aina näkyvissä, muu sisältö repussa */
+function renderPerks(){
+  if (mode !== "run" || !RUN){ invBtn.classList.add("hidden"); return; }
+  invBtn.classList.remove("hidden");
+  const n = Object.keys(RUN.perks).length + Object.keys(RUN.curses).length + RUN.items.length;
+  invBadge.innerHTML =
+    (RUN.amulets > 0 ? `⚡${RUN.amulets} ` : "") +
+    `🎒<span class="inv-count">${n}</span>`;
+  if (invOverlay.classList.contains("show")) renderInventory();
+}
+
+function renderInventory(){
+  const card = (icon, name, desc, cls = "") =>
+    `<div class="card${cls}" style="cursor:default">` +
+    `<span class="cicon">${icon}</span>` +
+    `<span class="cname">${name}</span>` +
+    `<span class="cdesc">${desc}</span></div>`;
+  let html = "";
+  html += `<div class="shop-section">Suojat</div><div class="cards">`;
+  html += RUN.amulets > 0
+    ? card(AMULET.icon, `${AMULET.name} ×${RUN.amulets}`, AMULET.desc)
+    : card("·", "Ei Ukonvaajoja", "Pääpomot ja jotkin kohtaamiset suojaavat matkaa.");
+  html += `</div>`;
+  const perkIds = Object.keys(RUN.perks);
+  if (perkIds.length){
+    html += `<div class="shop-section">Varusteet</div><div class="cards">`;
+    for (const id of perkIds)
+      html += card(PERKS[id].icon,
+        PERKS[id].name + (RUN.perks[id] > 1 ? ` ×${RUN.perks[id]}` : ""),
+        PERKS[id].desc);
+    html += `</div>`;
+  }
+  const curseIds = Object.keys(RUN.curses);
+  if (curseIds.length){
+    html += `<div class="shop-section">Kiroukset</div><div class="cards">`;
+    for (const id of curseIds)
+      html += card(CURSES[id].icon, CURSES[id].name, CURSES[id].desc, " curse");
+    html += `</div>`;
+  }
+  if (RUN.items.length){
+    html += `<div class="shop-section">Esineet</div><div class="cards">`;
+    for (const id of RUN.items){
+      const it = MYSTERY_ITEMS[id];
+      html += charIs("tietaja")
+        ? card(it.icon, it.name, "Paljastuu: " + it.reveal)
+        : card("❓", "Tuntematon esine", "Vaikutus paljastuu, kun sen hetki koittaa.");
+    }
+    html += `</div>`;
+  }
+  invBody.innerHTML = html;
+}
+
+invBtn.addEventListener("click", () => {
+  if (!RUN) return;
+  renderInventory();
+  invOverlay.classList.add("show");
+});
+document.getElementById("invClose").addEventListener("click", () =>
+  invOverlay.classList.remove("show"));
+
+const ACTS = [
+  { name: "Metsä",   miniboss: "Menninkäinen", boss: "Hiisi" },
+  { name: "Suo",     miniboss: "Näkki",        boss: "Vetehinen" },
+  { name: "Pohjola", miniboss: "Pakkanen",     boss: "Louhi" }
+];
+const runDepth = () => (RUN.act - 1) * 10 + RUN.stage;
+const AMULET_CAP = 3;
+
+/* Kaikki vaajatulot kulkevat tästä: katon ylittävät muuttuvat pisteiksi */
+function gainAmulet(n = 1){
+  let gained = 0;
+  for (let i = 0; i < n; i++){
+    if (RUN.amulets < AMULET_CAP){ RUN.amulets++; gained++; }
+    else RUN.score += 300;
+  }
+  if (gained < n) showBanner("Vaajat täynnä: +%d00 p".replace("%d", (n - gained) * 3));
+  return gained;
+}
+
+/* Hyökkäykset: id -> { icon, teksti, toteutus performBossAttackissa } */
+const BOSS_ATTACKS = {
+  "Menninkäinen": ["steal", "freeze"],
+  "Hiisi":        ["moss", "freeze", "steal"],
+  "Näkki":        ["freeze", "moss", "eat"],
+  "Vetehinen":    ["moss", "steal", "eat", "freeze"],
+  "Pakkanen":     ["freeze", "freeze", "eat"],
+  "Louhi":        ["moss", "freeze", "steal", "eat"]
+};
+const ATTACK_INFO = {
+  freeze: { icon: "❄",  label: "Halla" },
+  moss:   { icon: "🌿", label: "Sammalpanssari" },
+  steal:  { icon: "🫳", label: "Ryöstö" },
+  eat:    { icon: "⏳", label: "Ahmaisu" }
+};
+
+let BATTLE = null; // { hp, maxHp, name, mini, attacks, next, counter, cadence, enraged }
+
+function makeBattleSpec(){
+  const mini = RUN.stage === 5;
+  const a = ACTS[RUN.act - 1];
+  const name = mini ? a.miniboss : a.boss;
+  const tune = battleTuning(runDepth(), mini);
+  return { battle: true, boss: true, mini, name, moves: tune.moves, hp: tune.hp };
+}
+
+function showMainMenu(){
+  RUN = null;
+  document.body.className = "";
+  Sfx.setMood(1);
+  gameOver = true;
+  busy = false;
+  renderPerks();
+  renderBossBar();
+  updateStats();
+  const recLine = record
+    ? `<br>Pisin vaellus: <b>${record.act}. korpi · ${record.stage}/10</b> (${record.score} p)`
+    : "";
+  const memNote = Store.persistent() ? "" :
+    `<br><span style="font-size:.75rem;opacity:.7">(tallennus toimii vain istunnon ajan tässä ympäristössä)</span>`;
+  const provLine = Object.keys(provisions).filter(k => provisions[k]).length
+    ? `<br><span style="font-size:.8rem">Eväät pakattu: ` +
+      Object.keys(provisions).filter(k => provisions[k])
+        .map(k => AITTA_GOODS.once.find(g => g.id === k).icon).join(" ") + `</span>`
+    : "";
+  if (!unlocks[selectedChar] && selectedChar !== "poimija") selectedChar = "poimija";
+  const charBtns = Object.keys(CHARS).map(id => {
+    const c = CHARS[id];
+    const open = id === "poimija" || unlocks[id];
+    return `<button class="char${id === selectedChar ? " sel" : ""}${open ? "" : " locked"}"` +
+      ` data-char="${id}" ${open ? "" : "disabled"} title="${open ? c.power : c.unlock}">` +
+      `${open ? c.icon : "🔒"}<span>${open ? c.name : "???"}</span></button>`;
+  }).join("");
+  ovTitle.textContent = "POIMURI";
+  ovText.innerHTML =
+    `<div class="charrow">${charBtns}</div>` +
+    `<div class="charpower">${CHARS[selectedChar].power}</div>` +
+    `Aitassa: <b>${aitta}</b> 🫐${recLine}${provLine}${memNote}<br><br>` +
+    `<button class="btn" id="startRunBtn">Aloita vaellus</button>` +
+    `<span style="display:inline-block;width:8px"></span>` +
+    `<button class="btn small" id="shopBtn">Aitta</button>`;
+  ovBtn.style.display = "none";
+  overlay.classList.add("show", "menu");
+  ovText.querySelectorAll(".char:not(.locked)").forEach(b => {
+    b.addEventListener("click", () => {
+      selectedChar = b.dataset.char;
+      Store.set("char", selectedChar);
+      showMainMenu();
+    });
+  });
+  document.getElementById("startRunBtn").addEventListener("click", startRun);
+  document.getElementById("shopBtn").addEventListener("click", openShop);
+}
+
+function startRun(){
+  RUN = {
+    act: 1, stage: 1, char: selectedChar,
+    score: 0, berries: 0,
+    perks: {}, curses: {}, amulets: 0, items: [],
+    spec: null, finished: false,
+    sinceEnc: 0, pendingDraft: false, lastEnc: null, nextMod: null
+  };
+  // hahmon aloitusedut
+  if (RUN.char === "poimija") RUN.amulets = heroUpgraded() ? 2 : 1;
+  if (RUN.char === "kaataja") RUN.perks.puukko = 1;
+  // Aitasta pakatut eväät kuluvat nyt
+  if (provisions.vaaja){ gainAmulet(); }
+  if (provisions.kontti){ grantRandomPerk(); }
+  if (provisions.kaaro){ giveMysteryItem(); }
+  provisions = {};
+  Store.set("provisions", provisions);
+  RUN.spec = nextSpec();
+  ovBtn.style.display = "";
+  overlay.classList.remove("show", "menu");
+  newGame();
+}
+
+/* kenttien 5 ja 10 pomopaikat ovat taisteluita, muut tavoitekenttiä */
+function nextSpec(){
+  return (RUN.stage === 5 || RUN.stage === 10)
+    ? makeBattleSpec()
+    : genRunLevel(runDepth(), false);
+}
+
+async function runLevelWin(){
+  gameOver = true;
+  Sfx.setTension(false);
+  if (moves > 0) await harvestFinish();
+  Sfx.fanfare();
+  RUN.score += Math.round(score * (curseOn("ahneus") ? 1.5 : 1));
+  score = 0;
+  if (RUN.spec.battle){
+    RUN.score += RUN.spec.mini ? 400 : 700;
+    if (!RUN.spec.mini) gainAmulet(); // vain pääpomo antaa vaajan
+    showBanner((RUN.spec.mini ? "" : "PÄÄPOMO ") + BATTLE.name + " kaatui!" +
+      (RUN.spec.mini ? "" : " ⚡"));
+    Sfx.crack();
+    BATTLE = null;
+    renderBossBar();
+    boardEl.classList.remove("enrage");
+  }
+  updateStats();
+  renderPerks();
+  resetIdle();
+  // eteneminen: kenttä 10 päättää aktin
+  if (RUN.stage >= 10){
+    if (RUN.act >= ACTS.length){ runVictory(); return; }
+    RUN.act++;
+    RUN.stage = 1;
+    RUN.spec = nextSpec();
+    actTransition();
+    return;
+  }
+  RUN.stage++;
+  await sleep(dur(800));
+  proceedBetweenStages();
+}
+
+function actTransition(){
+  const a = ACTS[RUN.act - 1];
+  updateRunRecord();
+  const newChar = RUN.act === 2 && unlockChar("tietaja");
+  ovTitle.textContent = a.name;
+  ovText.innerHTML =
+    `${ACTS[RUN.act - 2].boss} kaatui!<br>` +
+    `Polku jatkuu kohti aluetta <b>${a.name}</b>.<br>` +
+    `Vartijat: ${a.miniboss} ja ${a.boss}.` +
+    (newChar ? `<br><span class="record">Uusi hahmo avattu: 🔮 Tietäjä!</span>` : "");
+  ovBtn.textContent = "Jatka vaellusta";
+  overlay.classList.add("show");
+}
+
+function runLevelFail(){
+  Sfx.setTension(false);
+  gameOver = true;
+  resetIdle();
+  boardEl.classList.remove("enrage");
+  if (RUN.amulets === 0 && RUN.items.includes("ukonkivi")){
+    consumeItem("ukonkivi");
+    ovTitle.textContent = "Ukonkivi pelasti!";
+    ovText.innerHTML = `Kivi murskautuu ja imee iskun – sama kenttä alkaa alusta.`;
+    ovBtn.textContent = "Jatka vaellusta";
+    overlay.classList.add("show");
+    return;
+  }
+  if (RUN.amulets > 0){
+    RUN.amulets--;
+    Sfx.crack();
+    renderPerks();
+    ovTitle.textContent = "Ukonvaaja pelasti!";
+    ovText.innerHTML =
+      `Vaaja otti iskun vastaan – sama kenttä alkaa alusta.<br>` +
+      `Vaajoja jäljellä: <b>${RUN.amulets}</b>`;
+    ovBtn.textContent = "Jatka vaellusta";
+    overlay.classList.add("show");
+    return;
+  }
+  Sfx.gameOver();
+  RUN.score += score;
+  score = 0;
+  RUN.finished = true;
+  const rec = updateRunRecord();
+  const banked = bankBerries(RUN.berries);
+  ovTitle.textContent = "Vaellus päättyi";
+  ovText.innerHTML =
+    `Matka: <b>${RUN.act}. korpi · ${RUN.stage}/10</b> · Saalis: <b>${RUN.score}</b> p` +
+    `<br>Aittaan: <b>+${banked}</b> 🫐 (yhteensä ${aitta})` +
+    (rec ? `<br><span class="record">Uusi ennätys!</span>` : "");
+  ovBtn.textContent = "Päävalikkoon";
+  overlay.classList.add("show");
+}
+
+function runVictory(){
+  gameOver = true;
+  RUN.finished = true;
+  const rec = updateRunRecord();
+  const banked = bankBerries(RUN.berries);
+  resetIdle();
+  const newChar = unlockChar("kaataja");
+  ovTitle.textContent = "Louhi on lyöty!";
+  ovText.innerHTML =
+    `Koko vaellus taitettu – kolme aktia ja kolmekymmentä kenttää!<br>` +
+    `Saalis: <b>${RUN.score}</b> pistettä` +
+    `<br>Aittaan: <b>+${banked}</b> 🫐 (yhteensä ${aitta})` +
+    (newChar ? `<br><span class="record">Uusi hahmo avattu: 🗡️ Karhunkaataja!</span>` : "") +
+    (rec ? `<br><span class="record">Uusi ennätys!</span>` : "");
+  ovBtn.textContent = "Päävalikkoon";
+  overlay.classList.add("show");
+}
+
+function updateRunRecord(){
+  const prog = (RUN.act - 1) * 10 + RUN.stage;
+  const old = record ? (record.act - 1) * 10 + record.stage : 0;
+  const better = !record || prog > old || (prog === old && RUN.score > record.score);
+  if (better){
+    record = { act: RUN.act, stage: RUN.stage, score: RUN.score };
+    Store.set("record", record);
+  }
+  return better;
+}
+
+/* Varustevalinta: kaksi varustetta + kolmas paikka (kirous/vaaja/varuste) */
+function openDraft(){
+  const slots = [];
+  const unmaxed = () => Object.keys(PERKS).filter(id =>
+    (RUN.perks[id] || 0) < PERKS[id].max && !slots.some(s => s.id === id));
+  const takePerk = () => {
+    const cand = unmaxed();
+    return cand.length ? { kind: "perk", id: cand[Math.floor(Math.random() * cand.length)] } : null;
+  };
+  const p1 = takePerk(); if (p1) slots.push(p1);
+  const p2 = takePerk(); if (p2) slots.push(p2);
+  const roll = Math.random();
+  const freeCurses = Object.keys(CURSES).filter(id => !RUN.curses[id]);
+  if (roll < 0.25 && freeCurses.length)
+    slots.push({ kind: "curse", id: freeCurses[Math.floor(Math.random() * freeCurses.length)] });
+  else if (roll < 0.42 && RUN.amulets < AMULET_CAP)
+    slots.push({ kind: "amulet" });
+  else {
+    const p3 = takePerk();
+    slots.push(p3 || { kind: "amulet" });
+  }
+  if (!slots.length) slots.push({ kind: "amulet" });
+
+  draftCards.innerHTML = trailHTML() + slots.map((s, i) => {
+    const item = s.kind === "perk" ? PERKS[s.id]
+               : s.kind === "curse" ? CURSES[s.id]
+               : AMULET;
+    const owned = s.kind === "perk" && RUN.perks[s.id] ? ` (omistat ×${RUN.perks[s.id]})` : "";
+    const name = item.name;
+    const cls = s.kind === "curse" ? " curse" : s.kind === "amulet" ? " amu" : "";
+    return `<button class="card${cls}" data-i="${i}">` +
+      `<span class="cicon">${item.icon}</span>` +
+      `<span class="cname">${name}${owned}</span>` +
+      `<span class="cdesc">${item.desc}</span></button>`;
+  }).join("");
+  draftCards.querySelectorAll(".card").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const s = slots[+btn.dataset.i];
+      if (s.kind === "perk")       RUN.perks[s.id] = (RUN.perks[s.id] || 0) + 1;
+      else if (s.kind === "curse") RUN.curses[s.id] = true;
+      else                         gainAmulet();
+      Sfx.born();
+      draftOverlay.classList.remove("show");
+      RUN.spec = nextSpec();
+      newGame();
+    });
+  });
+  draftOverlay.classList.add("show");
+}
+
+/* =========================================================
+   Kohtaamiset: satunnaistapahtumat kenttien välissä
+   ========================================================= */
+
+const encOverlay = document.getElementById("encOverlay");
+const encBody    = document.getElementById("encBody");
+
+function randomFreeCurse(){
+  const free = Object.keys(CURSES).filter(id => !RUN.curses[id]);
+  return free.length ? free[Math.floor(Math.random() * free.length)] : null;
+}
+function grantRandomPerk(){
+  const cand = Object.keys(PERKS).filter(id => (RUN.perks[id] || 0) < PERKS[id].max);
+  if (!cand.length) return null;
+  const id = cand[Math.floor(Math.random() * cand.length)];
+  RUN.perks[id] = (RUN.perks[id] || 0) + 1;
+  return id;
+}
+function giveMysteryItem(){
+  const cand = Object.keys(MYSTERY_ITEMS).filter(id => !RUN.items.includes(id));
+  if (!cand.length) return null;
+  const id = cand[Math.floor(Math.random() * cand.length)];
+  RUN.items.push(id);
+  return id;
+}
+function consumeItem(id){
+  const i = RUN.items.indexOf(id);
+  if (i === -1) return false;
+  RUN.items.splice(i, 1);
+  showBanner(`❓ ${MYSTERY_ITEMS[id].name}: ${MYSTERY_ITEMS[id].reveal}`);
+  Sfx.born();
+  renderPerks();
+  return true;
+}
+
+const ENCOUNTERS = [
+  { id: "sieni", icon: "🍄", title: "Outo sieni",
+    text: "Mättäällä hohtaa sieni, jollaista et ole koskaan nähnyt. Se tuoksuu makealta.",
+    choices: [
+      { label: "Maista", desc: "Uhkapeli: herkku tai kosto",
+        act(){
+          if (Math.random() < 0.5){ RUN.score += 600; return "Maku on taivaallinen! <b>+600 p</b>"; }
+          const c = randomFreeCurse();
+          if (c){ RUN.curses[c] = true; return `Vatsa vääntyy... <b>${CURSES[c].name}</b> tarttuu matkaan!`; }
+          RUN.score = Math.max(0, RUN.score - 300);
+          return "Vatsa vääntyy pahasti. <b>−300 p</b>";
+        } },
+      { label: "Vuole näyte", desc: "Turvallinen tutkimus: +250 p", requires: "puukko",
+        act(){ RUN.score += 250; return "Puukko viipaloi siistin näytteen talteen. <b>+250 p</b>"; } },
+      { label: "Jatka matkaa", desc: "Ei riskejä",
+        act(){ return "Annat sienen hohtaa rauhassa."; } }
+    ] },
+  { id: "eukko", icon: "👵", title: "Marjaeukko",
+    text: "Polulla istuu eukko täysien korien keskellä. \"Vaihdetaanko, kulkija?\"",
+    choices: [
+      { label: "Vaihda varuste", desc: "Satunnainen varusteesi → 2 Ukonvaajaa", requiresAnyPerk: true,
+        act(){
+          const ids = Object.keys(RUN.perks);
+          const id = ids[Math.floor(Math.random() * ids.length)];
+          RUN.perks[id]--;
+          if (!RUN.perks[id]) delete RUN.perks[id];
+          const g = gainAmulet(2);
+          return `Eukko vie <b>${PERKS[id].name}</b> ja ojentaa <b>${g} ⚡ Ukonvaajaa</b>` +
+            (g < 2 ? " (loput painuvat pisteiksi)" : "") + ".";
+        } },
+      { label: "Osta mytty", desc: "400 p → tuntematon esine", minScore: 400,
+        act(){
+          RUN.score -= 400;
+          const it = giveMysteryItem();
+          if (it) return "Saat kankaisen mytyn. <b>❓ Tuntematon esine</b>";
+          RUN.score += 400;
+          return "Eukon kori onkin tyhjä – saat rahat takaisin.";
+        } },
+      { label: "Kiitä ja jatka", desc: "",
+        act(){ return "Eukko hymyilee hampaattomasti ja jatkaa poimimista."; } }
+    ] },
+  { id: "kelo", icon: "🪵", title: "Kaatunut kelo",
+    text: "Valtava hopeanharmaa kelo makaa polun poikki.",
+    choices: [
+      { label: "Vuole kulkuaukko", desc: "Puukko tekee tietä – ja muistoesineen", requires: "puukko",
+        act(){
+          const p = grantRandomPerk();
+          if (p) return `Lastuista syntyy jotain: <b>${PERKS[p].icon} ${PERKS[p].name}</b>!`;
+          gainAmulet();
+          return "Vuolet ukonvaajan muotoisen taikakalun. <b>+1 ⚡</b>";
+        } },
+      { label: "Kiipeä yli", desc: "+300 p, mutta seuraava kenttä −2 siirtoa",
+        act(){ RUN.nextMod = { moves: -2 }; RUN.score += 300;
+          return "Rungon päältä poimit unohtuneen korin. <b>+300 p</b> – mutta voimat hupenevat."; } },
+      { label: "Kierrä", desc: "Hidas mutta varma",
+        act(){ return "Kierrät kelon kaikessa rauhassa."; } }
+    ] },
+  { id: "lintu", act: 1, icon: "🐦", title: "Arka tiainen",
+    text: "Tiainen räpiköi polulla – siipi on parantunut, mutta lentoon lähtö arveluttaa. Se kaipaa saattajaa kuusikon halki.",
+    choices: [
+      { label: "Lennä mukana", desc: "Käpylintu-lento: portit palkitsevat",
+        act(){ return { minigame: "kapylintu" }; } },
+      { label: "Jatka matkaa", desc: "",
+        act(){ return "Tiainen tirskahtaa pettyneenä ja jää oksalle."; } }
+    ] },
+  { id: "suonsilma", act: 2, icon: "🐸", title: "Upottava suonsilmä",
+    text: "Polku katkeaa mustaan suonsilmään. Mättäät ja ajelehtivat tukit ovat ainoa tie yli.",
+    choices: [
+      { label: "Loiki yli", desc: "Suohyppely: rivit palkitsevat",
+        act(){ return { minigame: "suohyppely" }; } },
+      { label: "Kierrä pitkää reittiä", desc: "Uuvuttavaa: seuraava kenttä −1 siirto",
+        act(){ RUN.nextMod = { moves: -1 };
+          return "Kierto vie voimia, mutta kuivin jaloin pääset. <b>−1 siirto</b> seuraavaan."; } }
+    ] },
+  { id: "rinne", act: 3, icon: "🛷", title: "Jyrkkä tunturinrinne",
+    text: "Edessä avautuu huimaava rinne. Hylätty ahkio odottaa hangessa kuin kutsuen.",
+    choices: [
+      { label: "Hyppää ahkioon", desc: "Ahkio-lasku: portit palkitsevat",
+        act(){ return { minigame: "ahkio" }; } },
+      { label: "Laskeudu jalan", desc: "",
+        act(){ return "Laskeudut varovasti, polvet tutisten."; } }
+    ] },
+  { id: "lahde", icon: "💧", title: "Kirkas lähde",
+    text: "Sammalten keskellä kumpuaa lähde. Vesi on jääkylmää ja kristallinkirkasta.",
+    choices: [
+      { label: "Juo syvään", desc: "Huuhtoo kirouksen – tai virkistää",
+        act(){
+          const ids = Object.keys(RUN.curses);
+          if (ids.length){
+            const id = ids[Math.floor(Math.random() * ids.length)];
+            delete RUN.curses[id];
+            return `Vesi huuhtoo pahan pois: <b>${CURSES[id].name}</b> hälvenee!`;
+          }
+          RUN.nextMod = { moves: 4 };
+          return "Olo kevenee: seuraava kenttä <b>+4 siirtoa</b>.";
+        } },
+      { label: "Jatka matkaa", desc: "",
+        act(){ return "Lähde solisee hiljaa taaksesi."; } }
+    ] },
+  { id: "aitta", icon: "🏚", title: "Hylätty aitta",
+    text: "Metsän keskellä nojaa vino, harmaantunut aitta. Ovi on raollaan.",
+    choices: [
+      { label: "Tutki sisältö", desc: "Jotain jää käteen – mutta mitä?",
+        act(){
+          const it = giveMysteryItem();
+          if (it) return "Nurkassa lojuu jotain kankaaseen käärittynä. <b>❓ Tuntematon esine</b>";
+          RUN.score += 250;
+          return "Vain vanhoja tuohia – ja niiden alla kolikoita. <b>+250 p</b>";
+        } },
+      { label: "Lepää portailla", desc: "Seuraava kenttä +3 siirtoa",
+        act(){ RUN.nextMod = { moves: 3 }; return "Hetken lepo tekee terää. <b>+3 siirtoa</b> seuraavaan."; } }
+    ] },
+  { id: "pesa", icon: "🐜", title: "Muurahaispesä",
+    text: "Polun vieressä kohoaa komea keko. Sen kupeessa kimaltaa jotain.",
+    choices: [
+      { label: "Kaiva rohkeasti", desc: "Kimallus tai kirvelevä erehdys",
+        act(){
+          if (Math.random() < 0.45){ RUN.score += 400; return "Kekoon on hautautunut hopealusikka! <b>+400 p</b>"; }
+          RUN.nextMod = { moves: -2 };
+          return "Muurahaiset puolustavat kotiaan kiivaasti. Seuraava kenttä <b>−2 siirtoa</b>.";
+        } },
+      { label: "Kaiva virsuilla", desc: "Tuohivirsut suojaavat: +400 p", requires: "virsut",
+        act(){ RUN.score += 400; return "Virsut pitävät puremat loitolla. <b>+400 p</b>"; } },
+      { label: "Kunnioita kekoa", desc: "",
+        act(){ return "Metsä muistaa hyvän tavan."; } }
+    ] },
+  { id: "kirnu", icon: "🕳️", title: "Hiidenkirnu",
+    text: "Kallioon on hioutunut syvä, pyöreä kuoppa. Pohjalta kuuluu vaimeaa kilinää.",
+    choices: [
+      { label: "Kurota pohjalle", desc: "Kilinä lupaa – mutta kuoppa on syvä",
+        act(){
+          if (Math.random() < 0.55){
+            const it = giveMysteryItem();
+            if (it) return "Sormet osuvat johonkin kääröön. <b>❓ Tuntematon esine</b>";
+            RUN.score += 250;
+            return "Pohjalla kimaltaa kolikoita. <b>+250 p</b>";
+          }
+          RUN.score = Math.max(0, RUN.score - 150);
+          return "Kurottaessasi taskusta kirpoaa kolikoita kuoppaan. <b>−150 p</b>";
+        } },
+      { label: "Jatka matkaa", desc: "",
+        act(){ return "Hiiden kirnut saavat pitää salaisuutensa."; } }
+    ] },
+  { id: "noita", icon: "🧙", title: "Vanha noita",
+    text: "Kelohonkien katveessa istuu noita, joka lukee lintujen lentoa. \"Vaivasi näkyy kauas, kulkija.\"",
+    choices: [
+      { label: "Maksa puhdistus", desc: "300 p: poistaa kirouksen – tai loitsii suojan", minScore: 300,
+        act(){
+          RUN.score -= 300;
+          const ids = Object.keys(RUN.curses);
+          if (ids.length){
+            const id = ids[Math.floor(Math.random() * ids.length)];
+            delete RUN.curses[id];
+            return `Noita polttaa katajaa ja lausuu sanat: <b>${CURSES[id].name}</b> haihtuu savuun!`;
+          }
+          gainAmulet();
+          return "Kirouksia ei ole – noita loitsii sen sijaan suojan. <b>+1 ⚡ Ukonvaaja</b>";
+        } },
+      { label: "Kieltäydy kohteliaasti", desc: "",
+        act(){ return "Noita kohauttaa olkiaan ja palaa lintuihinsa."; } }
+    ] },
+  { id: "karhunpesa", act: 1, icon: "🐻", title: "Karhunpesä",
+    text: "Kuusen juurella ammottaa pesäkolo. Sisältä kuuluu syvää, tasaista hengitystä.",
+    choices: [
+      { label: "Kurkista koloon", desc: "Rohkeus palkitaan – tai kostautuu",
+        act(){
+          if (Math.random() < 0.5){
+            if ((RUN.perks.kaato || 0) < PERKS.kaato.max){
+              RUN.perks.kaato = (RUN.perks.kaato || 0) + 1;
+              return "Karhu nukkuu syvässä unessa – opit sen mahdin. <b>🐻 Karhunkaato</b>!";
+            }
+            RUN.score += 400;
+            return "Pesän suulta löytyy hunajainen kätkö. <b>+400 p</b>";
+          }
+          RUN.nextMod = { moves: -3 };
+          return "Karhu murahtaa unissaan – pakenet henkesi edestä. Seuraava kenttä <b>−3 siirtoa</b>.";
+        } },
+      { label: "Hiivi ohi", desc: "",
+        act(){ return "Annat kontion nukkua rauhassa."; } }
+    ] },
+  { id: "nuotio", icon: "🔥", title: "Nuotiopaikka",
+    text: "Kivien ympäröimä nuotiopaikka. Tuhka on vielä lämmintä – joku on kulkenut edelläsi.",
+    choices: [
+      { label: "Sytytä ja lepää", desc: "Seuraava kenttä +4 siirtoa",
+        act(){ RUN.nextMod = { moves: 4 }; return "Liekit lämmittävät luihin asti. <b>+4 siirtoa</b> seuraavaan."; } },
+      { label: "Penko tuhkat", desc: "Reppu tuntee kätköt: +300 p", requires: "reppu",
+        act(){ RUN.score += 300; return "Repun sivutaskusta löytyy tuhkakätköjen kartta. <b>+300 p</b>"; } }
+    ] }
+];
+
+/* =========================================================
+   Aitta: pysyvä kauppa marjavarannolle
+   ========================================================= */
+
+const shopOverlay = document.getElementById("shopOverlay");
+const shopBody    = document.getElementById("shopBody");
+const shopBalance = document.getElementById("shopBalance");
+
+function shopCard(g, state, note){
+  // state: "buy" | "soldout" | "locked"
+  const dis = state !== "buy";
+  const price = state === "soldout" ? "✓" : state === "locked" ? "🔒" : g.price + " 🫐";
+  return `<button class="card shopitem${dis ? (state === "soldout" ? " disabled soldout" : " disabled") : ""}"` +
+    ` data-id="${g.id}" ${dis ? "disabled" : ""}>` +
+    `<span class="cicon">${g.icon}</span>` +
+    `<span class="cname">${g.name}</span>` +
+    `<span class="cprice">${price}</span>` +
+    `<span class="cdesc">${note || g.desc}</span></button>`;
+}
+
+function renderShop(){
+  shopBalance.textContent = "Varannossa: " + aitta + " 🫐";
+  let html = `<div class="shop-section">Pysyvät parannukset</div><div class="cards">`;
+  html += AITTA_GOODS.perm.map(g =>
+    shopCard(g, owned[g.id] ? "soldout" : aitta >= g.price ? "buy" : "locked",
+             owned[g.id] ? g.desc + " (hankittu)" : aitta < g.price ? g.desc : null)).join("");
+  html += `</div><div class="shop-section">Eväät seuraavalle vaellukselle</div><div class="cards">`;
+  html += AITTA_GOODS.once.map(g =>
+    shopCard(g, provisions[g.id] ? "soldout" : aitta >= g.price ? "buy" : "locked",
+             provisions[g.id] ? g.desc + " (pakattu)" : null)).join("");
+  html += `</div><div class="shop-section">Hahmonkehitys</div><div class="cards">`;
+  html += AITTA_GOODS.hero.map(g => {
+    const open = g.char === "poimija" || unlocks[g.char];
+    const state = !open ? "locked" : owned[g.id] ? "soldout" : aitta >= g.price ? "buy" : "locked";
+    const note = !open ? CHARS[g.char].unlock
+               : owned[g.id] ? g.desc + " (hankittu)" : null;
+    return shopCard(g, state, note);
+  }).join("");
+  html += `</div>`;
+  shopBody.innerHTML = html;
+  shopBody.querySelectorAll(".card:not(.disabled)").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const id = btn.dataset.id;
+      const g = [...AITTA_GOODS.perm, ...AITTA_GOODS.once, ...AITTA_GOODS.hero]
+        .find(x => x.id === id);
+      if (!g || aitta < g.price) return;
+      aitta -= g.price;
+      Store.set("aitta", aitta);
+      if (AITTA_GOODS.once.some(x => x.id === id)){
+        provisions[id] = true;
+        Store.set("provisions", provisions);
+      } else {
+        owned[id] = true;
+        Store.set("owned", owned);
+      }
+      Sfx.born();
+      renderShop();
+    });
+  });
+}
+
+function openShop(){
+  renderShop();
+  shopOverlay.classList.add("show");
+}
+document.getElementById("shopClose").addEventListener("click", () => {
+  shopOverlay.classList.remove("show");
+  showMainMenu();
+});
+
+/* Matkajana: aktin 10 kenttää, ⚔ = miniboss, 👑 = pomo */
+function trailHTML(){
+  if (!RUN) return "";
+  let s = `<div class="trail">`;
+  for (let i = 1; i <= 10; i++){
+    const cls = (i < RUN.stage ? " done" : "") + (i === RUN.stage ? " cur" : "");
+    const mark = i === 10 ? "👑" : i === 5 ? "⚔️" : i;
+    s += `<span class="tnode${cls}">${mark}</span>`;
+    if (i < 10) s += `<span class="tlink${i < RUN.stage ? " done" : ""}"></span>`;
+  }
+  return s + `</div><div class="trail-label">${["Ensimmäinen","Toinen","Kolmas"][RUN.act - 1]} korpi · ${ACTS[RUN.act - 1].name}</div>`;
+}
+
+function proceedBetweenStages(){
+  RUN.sinceEnc = (RUN.sinceEnc || 0) + 1;
+  if (RUN.sinceEnc >= 2 && Math.random() < (permOwned("kartta") ? 0.8 : 0.6)){
+    RUN.sinceEnc = 0;
+    RUN.pendingDraft = true; // kohtaamisen jälkeen vielä varustevalinta
+    openEncounter();
+  } else {
+    openDraft();
+  }
+}
+
+function afterEncounter(){
+  encOverlay.classList.remove("show");
+  miniOverlay.classList.remove("show");
+  updateStats();
+  renderPerks();
+  if (RUN.pendingDraft){
+    RUN.pendingDraft = false;
+    openDraft();
+  } else {
+    RUN.spec = nextSpec();
+    newGame();
+  }
+}
+
+function openEncounter(forced){
+  const pool = ENCOUNTERS.filter(e =>
+    (!e.act || e.act === RUN.act) && e.id !== RUN.lastEnc);
+  const enc = forced || pool[Math.floor(Math.random() * pool.length)];
+  RUN.lastEnc = enc.id;
+  encBody.innerHTML = trailHTML() +
+    `<div class="enc-head">${enc.icon}</div>` +
+    `<h2>${enc.title}</h2>` +
+    `<p class="enc-text">${enc.text}</p>` +
+    `<div class="cards">` +
+    enc.choices.map((ch, i) => {
+      let locked = null;
+      if (ch.requires && !perkCount(ch.requires))
+        locked = `Vaatii: ${PERKS[ch.requires].icon} ${PERKS[ch.requires].name}`;
+      else if (ch.requiresAnyPerk && !Object.keys(RUN.perks).length)
+        locked = "Vaatii: vähintään yksi varuste";
+      else if (ch.minScore && RUN.score + score < ch.minScore)
+        locked = `Vaatii: ${ch.minScore} p`;
+      return `<button class="card${locked ? " disabled" : ""}" data-i="${i}" ${locked ? "disabled" : ""}>` +
+        `<span class="cicon">${enc.icon}</span>` +
+        `<span class="cname">${ch.label}</span>` +
+        `<span class="cdesc">${locked || ch.desc}</span></button>`;
+    }).join("") +
+    `</div>`;
+  encBody.querySelectorAll(".card:not(.disabled)").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const res = enc.choices[+btn.dataset.i].act();
+      if (res && res.minigame){
+        encOverlay.classList.remove("show");
+        launchMinigame(res.minigame);
+        return;
+      }
+      Sfx.select();
+      encBody.innerHTML =
+        `<div class="enc-head">${enc.icon}</div>` +
+        `<h2>${enc.title}</h2>` +
+        `<p class="enc-result">${res}</p>` +
+        `<button class="btn small guide-close" id="encContinue">Jatka vaellusta</button>`;
+      document.getElementById("encContinue").addEventListener("click", afterEncounter);
+    });
+  });
+  encOverlay.classList.add("show");
+}
+
+/* =========================================================
+   Polunhaarat: minipelien käynnistys ja palkkiot
+   ========================================================= */
+
+const miniOverlay = document.getElementById("miniOverlay");
+const miniCanvas  = document.getElementById("miniCanvas");
+const miniResult  = document.getElementById("miniResult");
+
+function launchMinigame(id){
+  miniResult.classList.add("hidden");
+  miniOverlay.classList.add("show");
+  MINIGAMES[id].start(gates => finishMinigame(gates));
+}
+
+function finishMinigame(gates){
+  const tiers = branchRewardTiers(gates);
+  const lines = [`Matka: <b>${gates}</b> porttia`];
+  if (tiers.pot > 0){
+    RUN.score += tiers.pot;
+    lines.push(`Pistepotti: <b>+${tiers.pot}</b>`);
+  }
+  if (tiers.perk){
+    const cand = Object.keys(PERKS).filter(id => (RUN.perks[id] || 0) < PERKS[id].max);
+    if (cand.length){
+      const id = cand[Math.floor(Math.random() * cand.length)];
+      RUN.perks[id] = (RUN.perks[id] || 0) + 1;
+      lines.push(`Varuste: ${PERKS[id].icon} <b>${PERKS[id].name}</b>`);
+    } else {
+      gainAmulet();
+      lines.push(`${AMULET.icon} <b>Ukonvaaja</b> (varusteet täynnä)`);
+    }
+  }
+  if (tiers.amulet){
+    gainAmulet();
+    lines.push(`${AMULET.icon} <b>Ukonvaaja!</b>`);
+  }
+  if (tiers.pot === 0) lines.push("Ei saalista tällä kertaa.");
+  (gates >= 5 ? Sfx.fanfare : Sfx.gameOver)();
+  miniResult.innerHTML =
+    `<h2>${gates >= 15 ? "Mestarilento!" : gates >= 5 ? "Hyvä lento!" : "Maihinlasku"}</h2>` +
+    `<div class="lines">${lines.join("<br>")}</div>` +
+    `<button class="btn small" id="miniContinue">Jatka vaellusta</button>`;
+  miniResult.classList.remove("hidden");
+  document.getElementById("miniContinue").addEventListener("click", afterEncounter);
+}
+
+/* =========================================================
+   Käpylintu – flappy-lento kuusikon halki
+   ========================================================= */
+
+function startKapylintu(onDone){
+  const ctx = miniCanvas.getContext("2d");
+  const W = miniCanvas.width, H = miniCanvas.height;
+  const GROUND = 26, BIRD_X = 92, BIRD_R = 11, OB_W = 56, SPACING = 208;
+  const GRAVITY = 0.34, FLAP_V = -6.2, MAX_FALL = 7.5; // 60 fps -yksiköissä
+
+  let bird = { y: H / 2, vy: 0 };
+  let obstacles = [];
+  let gates = 0, started = false, dead = false, doneCalled = false;
+  let scroll = 0, t = 0, raf = null, lastTime = 0;
+
+  // tulikärpäset tunnelmaksi
+  const flies = Array.from({ length: 10 }, () => ({
+    x: Math.random() * W, y: 60 + Math.random() * (H - 140),
+    p: Math.random() * Math.PI * 2
+  }));
+
+  const speed = () => 2.4 + Math.min(1.1, gates * 0.075);
+  const gapH  = () => Math.max(126, 168 - gates * 2.6);
+
+  function spawn(x){
+    const gh = gapH();
+    const gy = 60 + Math.random() * (H - GROUND - gh - 120);
+    obstacles.push({ x, gy, gh, passed: false });
+  }
+  spawn(W + 120); spawn(W + 120 + SPACING);
+
+  function flap(){
+    if (dead) return;
+    started = true;
+    bird.vy = FLAP_V;
+    Sfx.swap();
+  }
+
+  function die(){
+    if (dead) return;
+    dead = true;
+    Sfx.boom();
+    setTimeout(finish, 750);
+  }
+
+  function finish(){
+    if (doneCalled) return;
+    doneCalled = true;
+    cancelAnimationFrame(raf);
+    miniCanvas.removeEventListener("pointerdown", flap);
+    document.removeEventListener("keydown", onKey);
+    onDone(gates);
+  }
+
+  function onKey(e){
+    if (e.key === " " || e.key === "ArrowUp"){ e.preventDefault(); flap(); }
+  }
+  miniCanvas.addEventListener("pointerdown", flap);
+  document.addEventListener("keydown", onKey);
+
+  function drawTreeline(offset, baseY, s, color){
+    ctx.fillStyle = color;
+    const w = 46 * s;
+    for (let x = -(offset % w) - w; x < W + w; x += w){
+      ctx.beginPath();
+      ctx.moveTo(x, baseY);
+      ctx.lineTo(x + w / 2, baseY - 52 * s);
+      ctx.lineTo(x + w, baseY);
+      ctx.closePath();
+      ctx.fill();
+    }
+  }
+
+  function drawSpruceUp(x, w, topY){
+    // kuusi alhaalta ylös: runko + latvakerrokset
+    ctx.fillStyle = "#4a3016";
+    ctx.fillRect(x + w / 2 - 5, topY, 10, H - GROUND - topY);
+    ctx.fillStyle = "#2c4a34";
+    const layers = Math.max(2, Math.floor((H - GROUND - topY) / 46));
+    for (let i = 0; i < layers; i++){
+      const y = topY + i * 44;
+      const half = w / 2 + 6 - i * 1.5;
+      ctx.beginPath();
+      ctx.moveTo(x + w / 2, y - 14);
+      ctx.lineTo(x + w / 2 - half, y + 40);
+      ctx.lineTo(x + w / 2 + half, y + 40);
+      ctx.closePath();
+      ctx.fill();
+    }
+  }
+
+  function drawBranchDown(x, w, botY){
+    // ylhäältä roikkuva oksisto
+    ctx.fillStyle = "#4a3016";
+    ctx.fillRect(x + w / 2 - 5, 0, 10, botY);
+    ctx.fillStyle = "#243f2c";
+    const layers = Math.max(2, Math.floor(botY / 46));
+    for (let i = 0; i < layers; i++){
+      const y = botY - i * 44;
+      const half = w / 2 + 6 - i * 1.5;
+      ctx.beginPath();
+      ctx.moveTo(x + w / 2, y + 14);
+      ctx.lineTo(x + w / 2 - half, y - 40);
+      ctx.lineTo(x + w / 2 + half, y - 40);
+      ctx.closePath();
+      ctx.fill();
+    }
+  }
+
+  function drawBird(){
+    ctx.save();
+    ctx.translate(BIRD_X, bird.y);
+    ctx.rotate(Math.max(-0.45, Math.min(0.7, bird.vy * 0.06)));
+    // talitiainen: keltainen vatsa, tumma pää, valkoinen poski
+    ctx.fillStyle = "#e8c545";
+    ctx.beginPath(); ctx.ellipse(0, 1, 12, 9, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#2b3438";
+    ctx.beginPath(); ctx.ellipse(8, -4, 6.5, 5.5, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#f2edde";
+    ctx.beginPath(); ctx.ellipse(9.5, -3, 3, 2.6, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#c08c25";
+    ctx.beginPath(); ctx.moveTo(13, -4); ctx.lineTo(19, -3); ctx.lineTo(13, -1.5); ctx.closePath(); ctx.fill();
+    // siipi räpyttää
+    const wing = Math.sin(t * (bird.vy < 0 ? 0.9 : 0.3)) * 6;
+    ctx.fillStyle = "#3c4a50";
+    ctx.beginPath(); ctx.ellipse(-3, wing * 0.4, 8, 4.5, -0.4 + wing * 0.05, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+
+  function loop(now){
+    // aikapohjainen fysiikka: dt = 1 tarkoittaa 60 fps -askelta,
+    // joten peli tuntuu samalta 60, 90 ja 120 Hz näytöillä
+    if (!lastTime) lastTime = now;
+    const dt = Math.min(2.5, (now - lastTime) / 16.667);
+    lastTime = now;
+    t += dt;
+    if (started && !dead){
+      // eksakti ballistinen askel: paikka keskinopeudella, sitten nopeus
+      bird.y += (bird.vy + 0.5 * GRAVITY * dt) * dt;
+      bird.vy = Math.min(MAX_FALL, bird.vy + GRAVITY * dt);
+      if (bird.y < 14){ bird.y = 14; bird.vy = 0; }
+      scroll += speed() * dt;
+      for (const o of obstacles) o.x -= speed() * dt;
+      if (obstacles[obstacles.length - 1].x < W - SPACING) spawn(W + 60);
+      obstacles = obstacles.filter(o => o.x > -OB_W - 10);
+      // törmäykset ja portit
+      if (bird.y + BIRD_R > H - GROUND) die();
+      for (const o of obstacles){
+        if (BIRD_X + BIRD_R > o.x && BIRD_X - BIRD_R < o.x + OB_W){
+          if (bird.y - BIRD_R < o.gy || bird.y + BIRD_R > o.gy + o.gh) die();
+        }
+        if (!o.passed && o.x + OB_W < BIRD_X - BIRD_R){
+          o.passed = true;
+          gates++;
+          if (gates === 5 || gates === 10 || gates === 15) Sfx.born();
+          else Sfx.select();
+        }
+      }
+    }
+    // ---- piirto ----
+    const g = ctx.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0, "#0e1a13"); g.addColorStop(1, "#1d2f23");
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    drawTreeline(scroll * 0.25, H - GROUND - 8, 1.5, "rgba(20,36,27,.8)");
+    drawTreeline(scroll * 0.5,  H - GROUND - 2, 0.9, "rgba(28,47,35,.9)");
+    ctx.fillStyle = "#7fae6f";
+    for (const f of flies){
+      const a = 0.25 + 0.35 * (0.5 + Math.sin(t * 0.05 + f.p) / 2);
+      ctx.globalAlpha = a;
+      ctx.beginPath();
+      ctx.arc((f.x - scroll * 0.35 % W + W * 2) % W, f.y + Math.sin(t * 0.02 + f.p) * 8, 1.6, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    for (const o of obstacles){
+      drawBranchDown(o.x, OB_W, o.gy);
+      drawSpruceUp(o.x, OB_W, o.gy + o.gh);
+    }
+    ctx.fillStyle = "#17251c";
+    ctx.fillRect(0, H - GROUND, W, GROUND);
+    ctx.fillStyle = "#24402e";
+    ctx.fillRect(0, H - GROUND, W, 5);
+    drawBird();
+    // HUD
+    ctx.fillStyle = "#f2edde";
+    ctx.font = "800 22px Manrope, sans-serif";
+    ctx.textAlign = "left";
+    ctx.fillText("Portit: " + gates, 14, 32);
+    ctx.font = "700 12px Manrope, sans-serif";
+    ctx.fillStyle = "rgba(229,185,84,.85)";
+    ctx.fillText("5 · 10 · 15 = palkkiot", 14, 50);
+    if (!started){
+      ctx.textAlign = "center";
+      ctx.fillStyle = "#f2edde";
+      ctx.font = "800 20px Manrope, sans-serif";
+      ctx.fillText("Napauta lentääksesi", W / 2, H / 2 - 60);
+      ctx.font = "700 13px Manrope, sans-serif";
+      ctx.fillStyle = "rgba(242,237,222,.7)";
+      ctx.fillText("välilyönti tai kosketus räpyttää", W / 2, H / 2 - 38);
+    }
+    if (!doneCalled) raf = requestAnimationFrame(loop);
+  }
+  raf = requestAnimationFrame(loop);
+}
+
+/* =========================================================
+   Suohyppely – loikinta mättäiltä ajelehtiville tukeille
+   ========================================================= */
+
+function startSuohyppely(onDone){
+  const ctx = miniCanvas.getContext("2d");
+  const W = miniCanvas.width, H = miniCanvas.height;
+  const LANES = 7, CELL = W / LANES, ROWH = 54;
+
+  // rivit maailmakoordinaateissa: 0 = lähtö, kasvaa ylöspäin
+  const rows = [];
+  function rowDef(i){
+    while (rows.length <= i){
+      const k = rows.length;
+      if (k < 2 || k % 3 === 0 || Math.random() < 0.22){
+        rows.push({ type: "safe", tufts: Array.from({length: 4}, () => Math.random() * W) });
+      } else {
+        const logW = Math.max(1.5, 2.5 - k * 0.035) * CELL;
+        const gap  = (2.1 + Math.random() * 1.2) * CELL;
+        rows.push({
+          type: "water",
+          dir: Math.random() < 0.5 ? 1 : -1,
+          speed: (0.55 + k * 0.028 + Math.random() * 0.25) * CELL / 60,
+          logW, span: logW + gap,
+          offset: Math.random() * (logW + gap)
+        });
+      }
+    }
+    return rows[i];
+  }
+  const logsAt = (row, t) => {
+    // tukin vasemmat reunat hetkellä t (px, jaksollinen)
+    const base = ((row.offset + row.dir * row.speed * t) % row.span + row.span) % row.span;
+    const out = [];
+    for (let x = base - row.span * 2; x < W + row.span; x += row.span) out.push(x);
+    return out;
+  };
+  const onLogX = (row, t, px) => {
+    for (const lx of logsAt(row, t))
+      if (px >= lx - 4 && px <= lx + row.logW + 4) return lx;
+    return null;
+  };
+
+  let player = { row: 0, x: W / 2, squash: 0 };
+  let gates = 0, started = false, dead = false, doneCalled = false;
+  let cam = -20;               // maailman y-kohta ruudun alareunassa
+  let t = 0, raf = null, lastTime = 0;
+  const worldY = r => r * ROWH;
+  const screenY = r => H - 46 - (worldY(r) - cam);
+
+  function hop(dc, dr){
+    if (dead) return;
+    started = true;
+    const nr = Math.max(0, player.row + dr);
+    rowDef(nr + 8);
+    player.row = nr;
+    if (dc) player.x = Math.min(W - CELL / 2, Math.max(CELL / 2,
+      (Math.round(player.x / CELL - 0.5) + dc + 0.5) * CELL));
+    player.squash = 1;
+    gates = Math.max(gates, player.row);
+    Sfx.swap();
+    if (gates === 5 || gates === 10 || gates === 15) Sfx.born();
+  }
+  function die(splash){
+    if (dead) return;
+    dead = true;
+    Sfx[splash ? "invalid" : "boom"]();
+    setTimeout(finish, 750);
+  }
+  function finish(){
+    if (doneCalled) return;
+    doneCalled = true;
+    cancelAnimationFrame(raf);
+    miniCanvas.removeEventListener("pointerdown", onTap);
+    document.removeEventListener("keydown", onKey);
+    onDone(gates);
+  }
+  function onTap(e){
+    const rect = miniCanvas.getBoundingClientRect();
+    const px = (e.clientX - rect.left) / rect.width;
+    const py = (e.clientY - rect.top) / rect.height;
+    if (py > 0.7 && px < 0.33) hop(-1, 0);
+    else if (py > 0.7 && px > 0.67) hop(1, 0);
+    else hop(0, 1);
+  }
+  function onKey(e){
+    if (e.key === "ArrowUp"){ e.preventDefault(); hop(0, 1); }
+    else if (e.key === "ArrowLeft"){ e.preventDefault(); hop(-1, 0); }
+    else if (e.key === "ArrowRight"){ e.preventDefault(); hop(1, 0); }
+  }
+  miniCanvas.addEventListener("pointerdown", onTap);
+  document.addEventListener("keydown", onKey);
+  rowDef(12);
+
+  function loop(now){
+    if (!lastTime) lastTime = now;
+    const dt = Math.min(2.5, (now - lastTime) / 16.667);
+    lastTime = now;
+    t += dt;
+    if (started && !dead){
+      const row = rowDef(player.row);
+      if (row.type === "water"){
+        const lx = onLogX(row, t, player.x);
+        if (lx === null) die(true);
+        else player.x += row.dir * row.speed * dt;
+        if (player.x < -6 || player.x > W + 6) die(false);
+      }
+      // kamera valuu perässä ja kiihtyy
+      cam += (0.16 + gates * 0.012) * dt;
+      cam = Math.max(cam, worldY(player.row) - H * 0.62);
+      if (screenY(player.row) > H - 14) die(false); // jäit jälkeen
+    }
+    player.squash = Math.max(0, player.squash - 0.12 * dt);
+    // ---- piirto ----
+    ctx.fillStyle = "#20301f";
+    ctx.fillRect(0, 0, W, H);
+    const r0 = Math.max(0, Math.floor(cam / ROWH) - 1);
+    for (let i = r0; i < r0 + Math.ceil(H / ROWH) + 3; i++){
+      const row = rowDef(i), y = screenY(i);
+      if (row.type === "safe"){
+        ctx.fillStyle = i % 2 ? "#33502c" : "#2d4827";
+        ctx.fillRect(0, y - ROWH + 6, W, ROWH);
+        ctx.fillStyle = "#4a6a3a";
+        for (const tx of row.tufts){
+          ctx.beginPath();
+          ctx.ellipse(tx, y - 12, 9, 4.5, 0, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      } else {
+        ctx.fillStyle = "#17262d";
+        ctx.fillRect(0, y - ROWH + 6, W, ROWH);
+        ctx.strokeStyle = "rgba(120,160,170,.18)";
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        const wob = (t * row.speed * row.dir * 2) % 26;
+        for (let x = -26 + wob; x < W + 26; x += 26){
+          ctx.moveTo(x, y - 22);
+          ctx.quadraticCurveTo(x + 7, y - 26, x + 14, y - 22);
+        }
+        ctx.stroke();
+        for (const lx of logsAt(row, t)){
+          ctx.fillStyle = "#6a4a26";
+          ctx.beginPath();
+          ctx.roundRect(lx, y - 38, row.logW, 26, 12);
+          ctx.fill();
+          ctx.strokeStyle = "#513618";
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(lx + 8, y - 25); ctx.lineTo(lx + row.logW - 8, y - 25);
+          ctx.stroke();
+        }
+      }
+    }
+    // sammakko
+    const py = screenY(player.row) - 24;
+    const sq = 1 + player.squash * 0.25;
+    ctx.save();
+    ctx.translate(player.x, py);
+    ctx.scale(sq, 2 - sq);
+    ctx.fillStyle = "#5d8a3c";
+    ctx.beginPath(); ctx.ellipse(0, 0, 13, 11, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#79a852";
+    ctx.beginPath(); ctx.ellipse(0, -3, 9, 6.5, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#fff";
+    ctx.beginPath(); ctx.arc(-5, -9, 3.4, 0, Math.PI * 2); ctx.arc(5, -9, 3.4, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#222";
+    ctx.beginPath(); ctx.arc(-5, -9.5, 1.5, 0, Math.PI * 2); ctx.arc(5, -9.5, 1.5, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+    // HUD
+    ctx.fillStyle = "#f2edde";
+    ctx.font = "800 22px Manrope, sans-serif";
+    ctx.textAlign = "left";
+    ctx.fillText("Rivit: " + gates, 14, 32);
+    ctx.font = "700 12px Manrope, sans-serif";
+    ctx.fillStyle = "rgba(229,185,84,.85)";
+    ctx.fillText("5 · 10 · 15 = palkkiot", 14, 50);
+    if (!started){
+      ctx.textAlign = "center";
+      ctx.fillStyle = "#f2edde";
+      ctx.font = "800 20px Manrope, sans-serif";
+      ctx.fillText("Napauta loikataksesi", W / 2, H / 2 - 60);
+      ctx.font = "700 13px Manrope, sans-serif";
+      ctx.fillStyle = "rgba(242,237,222,.7)";
+      ctx.fillText("alakulmat loikkaavat sivulle", W / 2, H / 2 - 38);
+    }
+    if (!doneCalled) raf = requestAnimationFrame(loop);
+  }
+  raf = requestAnimationFrame(loop);
+}
+
+/* =========================================================
+   Ahkio – väistelylasku tunturinrinnettä alas
+   ========================================================= */
+
+function startAhkio(onDone){
+  const ctx = miniCanvas.getContext("2d");
+  const W = miniCanvas.width, H = miniCanvas.height;
+  const SLED_Y = 118, SLED_W = 26;
+
+  let x = W / 2, vx = 0, dir = 0;
+  let gates = 0, started = false, dead = false, doneCalled = false;
+  let t = 0, raf = null, lastTime = 0;
+  const snow = Array.from({ length: 26 }, () => ({
+    x: Math.random() * W, y: Math.random() * H,
+    s: 0.6 + Math.random() * 1.2
+  }));
+  const speed = () => 2.5 + Math.min(2.2, gates * 0.09);
+  const gapW  = () => Math.max(92, 128 - gates * 2.2);
+
+  // esteet: porttirivit ja irtopuut, liikkuvat ylöspäin (lasku alas)
+  let obs = [];
+  function spawnRow(y){
+    obs.push({ kind: "row", y, gapX: 30 + Math.random() * (W - 60 - gapW()), passed: false });
+    if (Math.random() < 0.4)
+      obs.push({ kind: "tree", y: y + 85, x: 20 + Math.random() * (W - 40) });
+  }
+  spawnRow(H + 60); spawnRow(H + 230);
+
+  function die(){
+    if (dead) return;
+    dead = true;
+    Sfx.boom();
+    setTimeout(finish, 750);
+  }
+  function finish(){
+    if (doneCalled) return;
+    doneCalled = true;
+    cancelAnimationFrame(raf);
+    miniCanvas.removeEventListener("pointerdown", onDown);
+    miniCanvas.removeEventListener("pointermove", onMove);
+    miniCanvas.removeEventListener("pointerup", onUp);
+    document.removeEventListener("keydown", onKeyD);
+    document.removeEventListener("keyup", onKeyU);
+    onDone(gates);
+  }
+  function setDirFromEvent(e){
+    const rect = miniCanvas.getBoundingClientRect();
+    dir = (e.clientX - rect.left) / rect.width < 0.5 ? -1 : 1;
+    started = true;
+  }
+  function onDown(e){ setDirFromEvent(e); }
+  function onMove(e){ if (e.buttons) setDirFromEvent(e); }
+  function onUp(){ dir = 0; }
+  function onKeyD(e){
+    if (e.key === "ArrowLeft"){ e.preventDefault(); dir = -1; started = true; }
+    else if (e.key === "ArrowRight"){ e.preventDefault(); dir = 1; started = true; }
+  }
+  function onKeyU(e){
+    if (e.key === "ArrowLeft" && dir === -1) dir = 0;
+    if (e.key === "ArrowRight" && dir === 1) dir = 0;
+  }
+  miniCanvas.addEventListener("pointerdown", onDown);
+  miniCanvas.addEventListener("pointermove", onMove);
+  miniCanvas.addEventListener("pointerup", onUp);
+  document.addEventListener("keydown", onKeyD);
+  document.addEventListener("keyup", onKeyU);
+
+  function drawTree(px, py, s){
+    ctx.fillStyle = "#22392b";
+    ctx.beginPath();
+    ctx.moveTo(px, py - 26 * s);
+    ctx.lineTo(px - 13 * s, py);
+    ctx.lineTo(px + 13 * s, py);
+    ctx.closePath(); ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(px, py - 38 * s);
+    ctx.lineTo(px - 9 * s, py - 16 * s);
+    ctx.lineTo(px + 9 * s, py - 16 * s);
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = "#e8edf2";
+    ctx.beginPath();
+    ctx.ellipse(px, py - 30 * s, 7 * s, 3 * s, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  function loop(now){
+    if (!lastTime) lastTime = now;
+    const dt = Math.min(2.5, (now - lastTime) / 16.667);
+    lastTime = now;
+    t += dt;
+    if (started && !dead){
+      vx += dir * 0.5 * dt;
+      vx *= Math.pow(0.92, dt);
+      x = Math.min(W - 16, Math.max(16, x + vx * dt));
+      for (const o of obs) o.y -= speed() * dt;
+      if (obs[obs.length - 1].y < H - 130) spawnRow(H + 60);
+      obs = obs.filter(o => o.y > -60);
+      for (const o of obs){
+        if (o.kind === "row"){
+          if (Math.abs(o.y - SLED_Y) < 26 &&
+              (x - SLED_W / 2 < o.gapX || x + SLED_W / 2 > o.gapX + gapW())) die();
+          if (!o.passed && o.y < SLED_Y - 26){
+            o.passed = true;
+            gates++;
+            (gates === 5 || gates === 10 || gates === 15 ? Sfx.born : Sfx.select)();
+          }
+        } else if (Math.abs(o.y - SLED_Y) < 24 && Math.abs(o.x - x) < 20){
+          die();
+        }
+      }
+    }
+    // ---- piirto ----
+    const g = ctx.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0, "#dfe8ef"); g.addColorStop(1, "#b8c9d6");
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    // laskujäljet
+    ctx.strokeStyle = "rgba(150,170,185,.4)";
+    ctx.lineWidth = 3;
+    for (const off of [-9, 9]){
+      ctx.beginPath();
+      ctx.moveTo(x + off, SLED_Y);
+      ctx.quadraticCurveTo(x + off - vx * 6, SLED_Y - 46, x + off - vx * 14, SLED_Y - 95);
+      ctx.stroke();
+    }
+    for (const o of obs){
+      if (o.kind === "row"){
+        for (let px = 16; px < W - 8; px += 34)
+          if (px < o.gapX - 6 || px > o.gapX + gapW() + 6) drawTree(px, o.y, 1);
+        ctx.fillStyle = "#c8443c";
+        ctx.fillRect(o.gapX - 3, o.y - 30, 4, 30);
+        ctx.fillRect(o.gapX + gapW() - 1, o.y - 30, 4, 30);
+      } else {
+        drawTree(o.x, o.y, 1.25);
+      }
+    }
+    // ahkio
+    ctx.save();
+    ctx.translate(x, SLED_Y);
+    ctx.rotate(Math.max(-0.4, Math.min(0.4, vx * 0.08)));
+    ctx.fillStyle = "#a33528";
+    ctx.beginPath(); ctx.roundRect(-SLED_W / 2, -8, SLED_W, 30, 7); ctx.fill();
+    ctx.fillStyle = "#e8c545";
+    ctx.beginPath(); ctx.arc(0, -2, 7, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#2b3438";
+    ctx.beginPath(); ctx.arc(0, -6, 4.6, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+    // lumisade
+    ctx.fillStyle = "rgba(255,255,255,.85)";
+    for (const f of snow){
+      f.y += (f.s + speed() * 0.4) * dt;
+      f.x += Math.sin(t * 0.02 + f.s * 7) * 0.4 * dt;
+      if (f.y > H){ f.y = -4; f.x = Math.random() * W; }
+      ctx.beginPath(); ctx.arc(f.x, f.y, f.s, 0, Math.PI * 2); ctx.fill();
+    }
+    // HUD
+    ctx.fillStyle = "#2b3a46";
+    ctx.font = "800 22px Manrope, sans-serif";
+    ctx.textAlign = "left";
+    ctx.fillText("Portit: " + gates, 14, 32);
+    ctx.font = "700 12px Manrope, sans-serif";
+    ctx.fillStyle = "rgba(120,90,20,.85)";
+    ctx.fillText("5 · 10 · 15 = palkkiot", 14, 50);
+    if (!started){
+      ctx.textAlign = "center";
+      ctx.fillStyle = "#2b3a46";
+      ctx.font = "800 20px Manrope, sans-serif";
+      ctx.fillText("Paina ja pidä ohjataksesi", W / 2, H / 2 - 60);
+      ctx.font = "700 13px Manrope, sans-serif";
+      ctx.fillStyle = "rgba(43,58,70,.7)";
+      ctx.fillText("vasen / oikea puoli kallistaa", W / 2, H / 2 - 38);
+    }
+    if (!doneCalled) raf = requestAnimationFrame(loop);
+  }
+  raf = requestAnimationFrame(loop);
+}
+
+function newGame(){
+  overlay.classList.remove("show", "menu");
+  ovBtn.style.display = "";
+  score = 0;
+  longestChain = 1;
+  specialsMade = 0;
+  gameOver = false;
+  busy = false;
+  Sfx.setTension(false);
+  setSelected(null);
+
+  if (!RUN){ showMainMenu(); return; }
+  ICONS = ICON_SETS[Math.min(3, RUN.act) - 1];
+  document.body.className = RUN.act >= 2 ? "act-" + Math.min(3, RUN.act) : "";
+  pyryCounter = 3;
+  {
+    const S = RUN.spec;
+    if (S.battle){
+      BATTLE = {
+        hp: S.hp, maxHp: S.hp,
+        name: S.name, mini: S.mini,
+        attacks: BOSS_ATTACKS[S.name] || ["freeze", "eat"],
+        next: null, counter: 2, cadence: 2, enraged: false, dmgMult: 1
+      };
+      BATTLE.next = BATTLE.attacks[Math.floor(Math.random() * BATTLE.attacks.length)];
+      BATTLE.next2 = BATTLE.attacks[Math.floor(Math.random() * BATTLE.attacks.length)];
+      if (owned[RUN.char + "2"] && RUN.char === "tietaja")
+        BATTLE.hp = BATTLE.maxHp = Math.round(BATTLE.hp * 0.9);
+      // tuntemattomat esineet paljastuvat taistelun alkaessa
+      if (RUN.items.includes("karhuntalja")){
+        setTimeout(() => consumeItem("karhuntalja"), 1400);
+        BATTLE.dmgMult = 1.5;
+      }
+      if (RUN.items.includes("hiidenhammas")){
+        setTimeout(() => consumeItem("hiidenhammas"), 2600);
+        BATTLE.hp = BATTLE.maxHp = Math.round(BATTLE.hp * 0.85);
+      }
+      if (RUN.items.includes("tervaskanto")){
+        setTimeout(() => consumeItem("tervaskanto"), 3800);
+        BATTLE.skipFirst = true;
+      }
+      if (RUN.items.includes("noidanrumpu")){
+        setTimeout(() => consumeItem("noidanrumpu"), 5000);
+        moves += 4;
+      }
+    } else {
+      BATTLE = null;
+      if (charIs("kaataja")) moves = Math.max(8, moves - 2);
+      if (permOwned("evaat") && RUN.stage === 1) moves += 3;
+      // eväskääry paljastuu tavoitekentän alussa
+      if (RUN.items.includes("evaskaary")){
+        setTimeout(() => consumeItem("evaskaary"), 1400);
+        moves += 3;
+      }
+    }
+    // kohtaamisten kenttämodifikaattorit (lepo, väsymys...)
+    if (RUN.nextMod){
+      moves = Math.max(6, moves + (RUN.nextMod.moves || 0));
+      RUN.nextMod = null;
+    }
+    moves = S.moves + 2 * perkCount("noppa") + (curseOn("halla") ? 3 : 0);
+    collectGoals = {};
+    for (const t in (S.collect || {}))
+      collectGoals[t] = Math.round(S.collect[t] * (curseOn("ahneus") ? 1.25 : 1));
+    dropTotal = S.drops || 0;
+    parseLayout(S.layout);
+    if (curseOn("halla")){
+      let n = 4, g = 0;
+      while (n > 0 && g++ < 100){
+        const r = 1 + Math.floor(Math.random() * (ROWS - 2));
+        const c = Math.floor(Math.random() * COLS);
+        if (!ices[r][c]){ ices[r][c] = true; n--; }
+      }
+    }
+  }
+  dropLeft = dropTotal;
+
+  ovBtn.textContent = "Jatka";
+
+  specials = emptySpecials();
+  // jäätyneet palat voivat harvoin tukkia kaikki siirrot – generoi silloin uusiksi
+  let guard = 0;
+  do {
+    types = generateTypes();
+    // käpykorit laudan ylälaitaan tasavälein
+    for (let i = 0; i < dropTotal; i++){
+      const c = Math.floor((i + 1) * COLS / (dropTotal + 1));
+      types[0][c] = T_DROP;
+    }
+  } while (!hasValidMove(types, specials, ices) && guard++ < 100);
+
+  // Vaellus: Karhunkaato asettaa käpälän/käpälät valmiiksi
+  for (let i = 0; i < perkCount("kaato"); i++){
+    const cand = [];
+    for (let r = 0; r < ROWS; r++)
+      for (let c = 0; c < COLS; c++)
+        if (types[r][c] >= 0 && specials[r][c] === S_NONE && !ices[r][c]) cand.push({ r, c });
+    if (cand.length){
+      const p = cand[Math.floor(Math.random() * cand.length)];
+      specials[p.r][p.c] = S_BOMB;
+    }
+  }
+
+  measure();
+  buildCellBackgrounds();
+  buildMossEls();
+  rebuildBoardDOM();
+  renderGoals();
+  updateCursorRing();
+  updateStats();
+  renderPerks();
+  renderBossBar();
+  boardEl.classList.remove("enrage");
+  Sfx.setMood(RUN.act);
+  resetIdle();
+  if (BATTLE){
+    showBanner((BATTLE.mini ? "" : "PÄÄPOMO: ") + BATTLE.name.toUpperCase() + "!");
+    Sfx.boom();
+  } else {
+    showBanner(RUN.spec.name + " · " + RUN.act + "." + RUN.stage);
+  }
+}
+
+/* =========================================================
+   Syöte: osoitin (napautus + pyyhkäisy)
+   ========================================================= */
+
+let pointerStart = null;
+
+function cellFromEvent(e){
+  const rect = boardEl.getBoundingClientRect();
+  const c = Math.floor((e.clientX - rect.left) / tileSize);
+  const r = Math.floor((e.clientY - rect.top) / tileSize);
+  if (r < 0 || r >= ROWS || c < 0 || c >= COLS) return null;
+  return { r, c };
+}
+
+boardEl.addEventListener("pointerdown", e => {
+  Sfx.unlock();
+  resetIdle();
+  if (busy || gameOver) return;
+  const cell = cellFromEvent(e);
+  if (!cell) return;
+  pointerStart = { cell, x: e.clientX, y: e.clientY };
+  boardEl.classList.remove("kb");
+});
+
+boardEl.addEventListener("pointermove", e => {
+  if (!pointerStart || busy || gameOver) return;
+  const dx = e.clientX - pointerStart.x;
+  const dy = e.clientY - pointerStart.y;
+  const threshold = tileSize * 0.4;
+  if (Math.max(Math.abs(dx), Math.abs(dy)) < threshold) return;
+  const { r, c } = pointerStart.cell;
+  let target;
+  if (Math.abs(dx) > Math.abs(dy)) target = { r, c: c + Math.sign(dx) };
+  else                             target = { r: r + Math.sign(dy), c };
+  pointerStart = null;
+  if (target.r < 0 || target.r >= ROWS || target.c < 0 || target.c >= COLS) return;
+  trySwap({ r, c }, target);
+});
+
+boardEl.addEventListener("pointerup", e => {
+  if (!pointerStart) return;
+  const cell = pointerStart.cell;
+  pointerStart = null;
+  if (busy || gameOver) return;
+  if (selected && selected.r === cell.r && selected.c === cell.c){
+    setSelected(null);
+  } else if (selected && Math.abs(selected.r - cell.r) + Math.abs(selected.c - cell.c) === 1){
+    trySwap(selected, cell);
+  } else if (ices[cell.r][cell.c]){
+    denyIce(cell);
+  } else {
+    Sfx.select();
+    setSelected(cell);
+  }
+});
+
+boardEl.addEventListener("pointercancel", () => { pointerStart = null; });
+
+/* =========================================================
+   Syöte: näppäimistö
+   ========================================================= */
+
+document.addEventListener("keydown", e => {
+  Sfx.unlock();
+  resetIdle();
+  if (guideOverlay.classList.contains("show")){
+    if (e.key === "Escape"){ e.preventDefault(); closeGuide(); }
+    return;
+  }
+  if (draftOverlay.classList.contains("show")) return; // valinta on pakollinen
+  if (encOverlay.classList.contains("show")) return;    // kohtaaminen on pakollinen
+  if (invOverlay.classList.contains("show")){
+    if (e.key === "Escape"){ e.preventDefault(); invOverlay.classList.remove("show"); }
+    return;
+  }
+  if (shopOverlay.classList.contains("show")){
+    if (e.key === "Escape"){
+      e.preventDefault();
+      shopOverlay.classList.remove("show");
+      showMainMenu();
+    }
+    return;
+  }
+  if (miniOverlay.classList.contains("show")) return;   // minipeli kuuntelee itse
+  if (gameOver && (e.key === "Enter" || e.key === " ")){ restartFromOverlay(); return; }
+  if (busy || gameOver) return;
+  const k = e.key;
+  if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"," ","Enter","Escape"].includes(k)){
+    e.preventDefault();
+    boardEl.classList.add("kb");
+  } else return;
+
+  if (k === "ArrowUp")    cursor.r = Math.max(0, cursor.r - 1);
+  if (k === "ArrowDown")  cursor.r = Math.min(ROWS - 1, cursor.r + 1);
+  if (k === "ArrowLeft")  cursor.c = Math.max(0, cursor.c - 1);
+  if (k === "ArrowRight") cursor.c = Math.min(COLS - 1, cursor.c + 1);
+  updateCursorRing();
+
+  if (k === "Escape") setSelected(null);
+  if (k === "Enter" || k === " "){
+    const cell = { r: cursor.r, c: cursor.c };
+    if (selected && selected.r === cell.r && selected.c === cell.c){
+      setSelected(null);
+    } else if (selected && Math.abs(selected.r - cell.r) + Math.abs(selected.c - cell.c) === 1){
+      trySwap(selected, cell);
+    } else if (ices[cell.r][cell.c]){
+      denyIce(cell);
+    } else {
+      Sfx.select();
+      setSelected(cell);
+    }
+  }
+});
+
+/* =========================================================
+   Koon muutos ja käynnistys
+   ========================================================= */
+
+let resizeTimer = null;
+window.addEventListener("resize", () => {
+  boardEl.classList.add("no-anim");
+  measure();
+  buildCellBackgrounds();
+  buildMossEls();
+  for (let r = 0; r < ROWS; r++)
+    for (let c = 0; c < COLS; c++)
+      if (tiles[r][c]) place(tiles[r][c], r, c);
+  if (selected) setSelected(selected);
+  updateCursorRing();
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => boardEl.classList.remove("no-anim"), 150);
+});
+
+const restartBtn = document.getElementById("restartBtn");
+restartBtn.addEventListener("click", () => {
+  if (busy) return;
+  // kesken vaelluksen varmistetaan - dialogitilanteissa (voitto/pelastus) mennään suoraan
+  if (RUN && !RUN.finished && !overlay.classList.contains("show")){
+    confirmAbandon();
+    return;
+  }
+  showMainMenu();
+});
+
+/* Varmistus vahinkonäpäytyksiä vastaan: keskeytys pankittaa saaliin */
+function confirmAbandon(){
+  ovTitle.textContent = "Keskeytetäänkö vaellus?";
+  ovText.innerHTML =
+    `Eteneminen menetetään, mutta poimitut marjat<br>` +
+    `(<b>${RUN.berries}</b> 🫐) pankitaan Aittaan.<br><br>` +
+    `<button class="btn small" id="abandonYes">Keskeytä vaellus</button>` +
+    `<span style="display:inline-block;width:8px"></span>` +
+    `<button class="btn small" id="abandonNo">Jatka pelaamista</button>`;
+  ovBtn.style.display = "none";
+  overlay.classList.add("show");
+  document.getElementById("abandonYes").addEventListener("click", () => {
+    RUN.finished = true;
+    updateRunRecord();
+    bankBerries(RUN.berries);
+    showMainMenu();
+  });
+  document.getElementById("abandonNo").addEventListener("click", () => {
+    overlay.classList.remove("show");
+    ovBtn.style.display = "";
+  });
+}
+ovBtn.addEventListener("click", restartFromOverlay);
+
+/* =========================================================
+   Poimijan opas
+   ========================================================= */
+
+const guideOverlay = document.getElementById("guideOverlay");
+const guideBtn = document.getElementById("guideBtn");
+const guideClose = document.getElementById("guideClose");
+
+document.getElementById("guideBody").innerHTML = `
+  <h3>Ohjaus</h3>
+  <p>Vaihda kahta vierekkäistä poimittavaa napauttamalla tai pyyhkäisemällä.
+     Näppäimistöllä: nuolet liikuttavat, <kbd>Enter</kbd> valitsee ja vaihtaa, <kbd>Esc</kbd> peruu.
+     Jos jäät jumiin, peli vihjaa siirron hetken kuluttua.</p>
+
+  <h3>Erikoispalat</h3>
+  <ul>
+    <li><span class="gi">${BADGES[1]}</span><span>Neljän sarja → <span class="sp-name">harava</span>:
+      kaataa koko rivin tai sarakkeen lauetessaan.</span></li>
+    <li><span class="gi">${BADGES[3]}</span><span>L- tai T-sarja → <span class="sp-name">karhunkäpälä</span>:
+      tonkii 3×3-alueen.</span></li>
+    <li><span class="gi">${WILD_ICON}</span><span>Viiden sarja → <span class="sp-name">kultakäpy</span>:
+      vaihda mihin tahansa poimittavaan, ja kaikki samanlaiset katoavat laudalta.</span></li>
+  </ul>
+
+  <h3>Yhdistelmät</h3>
+  <p>Vaihda kaksi erikoispalaa keskenään:</p>
+  <ul>
+    <li><span class="gi">${BADGES[1]}</span><span>Harava + harava → <span class="sp-name">risti</span>:
+      rivi ja sarake kerralla.</span></li>
+    <li><span class="gi">${BADGES[3]}</span><span>Karhunkäpälä + harava → <span class="sp-name">kolmoiskaato</span>:
+      kolme rinnakkaista linjaa.</span></li>
+    <li><span class="gi">${BADGES[3]}</span><span>Kaksi karhunkäpälää → <span class="sp-name">karhuemo</span>:
+      jättimäinen 5×5-tonkaisu.</span></li>
+    <li><span class="gi">${WILD_ICON}</span><span>Kaksi kultakäpyä → koko metsä tyhjenee.</span></li>
+  </ul>
+
+  <h3>Vaellus</h3>
+  <p>POIMURI on vaellus, jolla jokainen retki on erilainen ja häviö lopullinen:
+     <b>kolme korpea</b> (Metsä, Suo, Pohjola), kussakin kymmenen kenttää. Kentässä 5 vartioi
+     <span class="sp-name">miniboss</span> ja kentässä 10 korven <span class="sp-name">pomo</span>.
+     Kenttien välissä valitaan varuste, kirous tai ${AMULET.icon} vaaja – ja häviö päättää
+     vaelluksen, ellei <span class="sp-name">Ukonvaaja</span> suojele (kantomäärä enintään
+     kolme, ylimenevät muuttuvat pisteiksi). Pääpomon kaataminen antaa vaajan, miniboss
+     pistepotin. Keräämäsi varusteet, kiroukset ja esineet löytyvät tilastorivin
+     🎒 <span class="sp-name">Repusta</span> kuvauksineen. Kaikki poimitut marjat kertyvät
+     pysyvään <span class="sp-name">Aittaan</span>, josta ostetaan pysyviä parannuksia, eväitä
+     ja hahmonkehitystä. Kolme <span class="sp-name">hahmoa</span> pelataan auki: Poimija
+     alusta, Tietäjä pääsemällä toiseen korpeen ja Karhunkaataja läpäisemällä vaelluksen.</p>
+  <p><b>Sadonkorjuu</b>: kun kenttä ratkeaa siirtoja säästäen, jäljelle jääneet siirrot
+     muuttuvat haravoiksi, jotka laukeavat kertarysäyksellä – nopea poimija korjaa
+     suurimman sadon.</p>
+  <p><b>Pomotaisteluissa</b> jokainen poimittu pala tekee vahinkoa – ketju ja erikoispalat
+     moninkertaistavat. Pomo iskee joka toisella siirrolla ja <span class="sp-name">telegrafoi</span>
+     seuraavan hyökkäyksensä: ❄ jäädyttää, 🌿 kasvattaa panssarisammalta (sammaloitu poiminta
+     ei tee vahinkoa), 🫳 ryöstää erikoispalan ja ⏳ ahmaisee siirron. Puolivälissä pääpomo
+     <span class="sp-name">raivostuu</span> ja iskee joka siirrolla.</p>
+  <p>Kenttien välissä polku johtaa <span class="sp-name">kohtaamisiin</span>: riskivalintoja,
+     vaihtokauppoja ja minipelejä – jokaisella alueella omansa (🐦 Käpylintu, 🐸 Suohyppely,
+     🛷 Ahkio). Osa valinnoista aukeaa vain oikealla varusteella, ja
+     ❓ <span class="sp-name">tuntemattomien esineiden</span> vaikutus paljastuu vasta,
+     kun niiden hetki koittaa.</p>
+  <h3>Esteet ja erikoisuudet</h3>
+  <p>Alueilla on omat oikkunsa: Suossa <span class="sp-name">usva</span> peittää paloja –
+     peitetyn palan laji paljastuu vasta osumasta, mutta sokkona vaihtaminenkin on sallittua.
+     Pohjolassa <span class="sp-name">pyry</span> jäädyttää paloja kesken kentän muutaman
+     siirron välein.</p>
+  <ul>
+    <li><span class="gi">${MOSS_ICON}</span><span><span class="sp-name">Sammal</span> ohenee, kun sen päällä
+      oleva pala poimitaan. Tumma sammal vaatii kaksi poimintaa.</span></li>
+    <li><span class="gi">${ICE_ICON}</span><span><span class="sp-name">Jäätynyttä</span> palaa ei voi siirtää.
+      Ensimmäinen osuma särkee kuoren, seuraava poimii palan.</span></li>
+    <li><span class="gi">${DROP_ICON}</span><span><span class="sp-name">Käpykori</span> pitää saatella pohjariville
+      asti poimimalla paloja sen alta. Kori putoaa muiden mukana eikä tuhoudu.</span></li>
+    <li><span class="gi">${MOSS_ICON}</span><span>Joillain kentillä sammal <span class="sp-name">leviää</span>
+      viereiseen soluun aina, kun vuoro ei poimi yhtään sammalta.</span></li>
+  </ul>
+`;
+
+function openGuide(){ guideOverlay.classList.add("show"); }
+function closeGuide(){ guideOverlay.classList.remove("show"); }
+
+guideBtn.addEventListener("click", () => { Sfx.unlock(); openGuide(); });
+guideClose.addEventListener("click", closeGuide);
+guideOverlay.addEventListener("click", e => { if (e.target === guideOverlay) closeGuide(); });
+
+const soundBtn = document.getElementById("soundBtn");
+soundBtn.addEventListener("click", () => {
+  Sfx.unlock();
+  const soundOn = Sfx.toggle();
+  soundBtn.textContent = soundOn ? "🔊" : "🔇";
+  soundBtn.setAttribute("aria-pressed", soundOn);
+});
+
+const musicBtn = document.getElementById("musicBtn");
+musicBtn.addEventListener("click", () => {
+  Sfx.unlock();
+  const musicOn = Sfx.musicToggle();
+  musicBtn.textContent = musicOn ? "🎵" : "🔕";
+  musicBtn.setAttribute("aria-pressed", musicOn);
+});
+
+newGame();
+</script>
+
+<style>
+  #devBtn{
+    position:fixed; right:14px; bottom:14px; z-index:900;
+    width:48px; height:48px; border-radius:50%;
+    border:2px solid #e5b954; background:#1a2c20; color:#e5b954;
+    font-size:1.3rem; cursor:pointer; box-shadow:0 4px 14px rgba(0,0,0,.5);
+  }
+  #devPanel{
+    position:fixed; right:10px; bottom:70px; z-index:900;
+    width:min(320px, 94vw); max-height:72vh; overflow-y:auto;
+    background:#12201a; border:2px solid #e5b954; border-radius:12px;
+    padding:12px; display:none; color:#f2edde;
+    font-family:"Manrope","Segoe UI",system-ui,sans-serif; font-size:.85rem;
+  }
+  #devPanel.open{ display:block; }
+  #devPanel h4{
+    color:#e5b954; text-transform:uppercase; letter-spacing:.1em;
+    font-size:.7rem; margin:12px 0 6px; border-bottom:1px solid #3a5a44;
+    padding-bottom:3px;
+  }
+  #devPanel h4:first-child{ margin-top:0; }
+  #devPanel .row{ display:flex; flex-wrap:wrap; gap:5px; margin-bottom:4px; }
+  #devPanel button, #devPanel select{
+    font:inherit; font-size:.78rem; padding:5px 9px;
+    background:#24402e; color:#f2edde; border:1px solid #3a5a44;
+    border-radius:8px; cursor:pointer;
+  }
+  #devPanel button:hover{ border-color:#e5b954; }
+  #devPanel .wide{ width:100%; }
+</style>
+
+<button id="devBtn" title="Kehittäjätyökalut">🛠</button>
+<div id="devPanel"></div>
+
+<script>
+(function(){
+  "use strict";
+  const panel = document.getElementById("devPanel");
+  document.getElementById("devBtn").addEventListener("click", () =>
+    panel.classList.toggle("open"));
+
+  function devRun(act, stage){
+    RUN = {
+      act, stage, char: selectedChar,
+      score: 0, berries: 0,
+      perks: {}, curses: {}, amulets: 3, items: [],
+      spec: null, finished: false,
+      sinceEnc: 0, pendingDraft: false, lastEnc: null, nextMod: null
+    };
+  }
+  function enterField(act, stage){
+    devRun(act, stage);
+    RUN.spec = nextSpec();
+    overlay.classList.remove("show", "menu");
+    newGame();
+    panel.classList.remove("open");
+  }
+
+  // --- paneelin sisältö ---
+  const bossRows = ACTS.map((a, i) =>
+    `<button data-boss="${i + 1},5">⚔️ ${a.miniboss}</button>` +
+    `<button data-boss="${i + 1},10">👑 ${a.boss}</button>`).join("");
+  const miniRows = Object.keys(MINIGAMES).map(id =>
+    `<button data-mini="${id}">${MINIGAMES[id].icon} ${MINIGAMES[id].name}</button>`).join("");
+  const encRows = ENCOUNTERS.map(e =>
+    `<button data-enc="${e.id}">${e.icon} ${e.title}</button>`).join("");
+
+  panel.innerHTML =
+    `<h4>Kenttä</h4>
+     <div class="row">
+       <select id="devAct">${[1,2,3].map(a =>
+         `<option value="${a}">${a}. korpi – ${ACTS[a-1].name}</option>`).join("")}</select>
+       <select id="devStage">${Array.from({length:10},(_, i) =>
+         `<option value="${i+1}">kenttä ${i+1}</option>`).join("")}</select>
+       <button id="devGo" class="wide">Siirry kenttään</button>
+     </div>
+     <h4>Pomot</h4><div class="row">${bossRows}</div>
+     <h4>Minipelit</h4><div class="row">${miniRows}</div>
+     <h4>Kohtaamiset</h4><div class="row">${encRows}</div>
+     <h4>Työkalut</h4>
+     <div class="row">
+       <button id="devWin">Voita kenttä</button>
+       <button id="devMoves">+10 siirtoa</button>
+       <button id="devPerks">Kaikki varusteet</button>
+       <button id="devItem">+ esine</button>
+       <button id="devBerry">+1000 🫐</button>
+       <button id="devUnlock">Avaa hahmot</button>
+       <button id="devWipe">Tyhjennä tallennus</button>
+     </div>`;
+
+  document.getElementById("devGo").addEventListener("click", () =>
+    enterField(+document.getElementById("devAct").value,
+               +document.getElementById("devStage").value));
+
+  panel.querySelectorAll("[data-boss]").forEach(b =>
+    b.addEventListener("click", () => {
+      const [a, s] = b.dataset.boss.split(",").map(Number);
+      enterField(a, s);
+    }));
+
+  panel.querySelectorAll("[data-mini]").forEach(b =>
+    b.addEventListener("click", () => {
+      const id = b.dataset.mini;
+      devRun(id === "suohyppely" ? 2 : id === "ahkio" ? 3 : 1, 2);
+      overlay.classList.remove("show", "menu");
+      launchMinigame(id);
+      panel.classList.remove("open");
+    }));
+
+  panel.querySelectorAll("[data-enc]").forEach(b =>
+    b.addEventListener("click", () => {
+      const enc = ENCOUNTERS.find(e => e.id === b.dataset.enc);
+      devRun(enc.act || 1, 2);
+      overlay.classList.remove("show", "menu");
+      openEncounter(enc);
+      panel.classList.remove("open");
+    }));
+
+  document.getElementById("devWin").addEventListener("click", () => {
+    if (!RUN || RUN.finished) return;
+    if (BATTLE){ dealBossDamage(BATTLE.hp + 999); }
+    else { collectGoals = {}; mossLeft = 0; dropLeft = 0; }
+    runLevelWin();
+    panel.classList.remove("open");
+  });
+  document.getElementById("devMoves").addEventListener("click", () => {
+    if (!RUN) return;
+    moves += 10; updateStats();
+  });
+  document.getElementById("devPerks").addEventListener("click", () => {
+    if (!RUN) return;
+    for (const id in PERKS) RUN.perks[id] = PERKS[id].max;
+    renderPerks();
+  });
+  document.getElementById("devItem").addEventListener("click", () => {
+    if (!RUN) return;
+    giveMysteryItem(); renderPerks();
+  });
+  document.getElementById("devBerry").addEventListener("click", () =>
+    bankBerries(4000)); // /4-pankituksen läpi -> +1000
+  document.getElementById("devUnlock").addEventListener("click", () => {
+    unlockChar("tietaja"); unlockChar("kaataja");
+    if (!RUN) showMainMenu();
+  });
+  document.getElementById("devWipe").addEventListener("click", () => {
+    try { localStorage.removeItem("poimuri-vaellus"); } catch(e){}
+    location.reload();
+  });
+})();
+</script>
+
+</body>
+</html>
