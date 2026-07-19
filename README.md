@@ -57,7 +57,3 @@ Some orientation for the code in `game.js`:
 - **Persistence** (unlocks, Aitta savings, settings) uses `localStorage`.
 
 Deployment is GitHub Pages serving this repository as-is: push to `main` and the site updates.
-
-## License
-
-No license granted yet – all rights reserved. (Add a LICENSE file if you want to permit reuse.)
