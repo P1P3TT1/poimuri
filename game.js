@@ -3501,7 +3501,10 @@ function newGame(){
         if (types[r][c] >= 0 && specials[r][c] === S_NONE && !ices[r][c]) cand.push({ r, c });
     for (let i = 0; i < NM.wild && cand.length; i++){
       const p = cand.splice(Math.floor(Math.random() * cand.length), 1)[0];
+      // jokeri on kaksiosainen: laji T_WILD *ja* erikoisuus S_WILD –
+      // pelkkä laji piirtää kävyn, mutta jättää sen toimettomaksi
       types[p.r][p.c] = T_WILD;
+      specials[p.r][p.c] = S_WILD;
     }
   }
 

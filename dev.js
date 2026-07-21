@@ -29,6 +29,8 @@
     `<button data-mini="${id}">${MINIGAMES[id].icon} ${MINIGAMES[id].name}</button>`).join("");
   const encRows = ENCOUNTERS.map(e =>
     `<button data-enc="${e.id}">${e.icon} ${e.title}</button>`).join("");
+  const boonRows = BOON_CARDS.map(b =>
+    `<button data-boon="${b.id}">${b.icon} ${b.name}</button>`).join("");
 
   panel.innerHTML =
     `<h4>Kenttä</h4>
@@ -42,12 +44,19 @@
      <h4>Pomot</h4><div class="row">${bossRows}</div>
      <h4>Minipelit</h4><div class="row">${miniRows}</div>
      <h4>Kohtaamiset</h4><div class="row">${encRows}</div>
+     <h4>Eväskortit</h4>
+     <div class="row">${boonRows}</div>
+     <div class="row"><span class="devnote">Kortti käytetään ja kenttä
+       ladataan heti uudelleen, jotta vaikutus näkyy.</span></div>
      <h4>Työkalut</h4>
      <div class="row">
        <button id="devWin">Voita kenttä</button>
        <button id="devMoves">+10 siirtoa</button>
        <button id="devPerks">Kaikki varusteet</button>
+       <button id="devDraft">Varustevalinta</button>
+       <button id="devDrain">Ehdytä varustepooli</button>
        <button id="devItem">+ esine</button>
+       <button id="devSiru">+1 💠 siru</button>
        <button id="devBerry">+1000 🫐</button>
        <button id="devUnlock">Avaa hahmot</button>
        <button id="devWipe">Tyhjennä tallennus</button>
@@ -80,6 +89,34 @@
       openEncounter(enc);
       panel.classList.remove("open");
     }));
+
+  // Eväskortit: käytä kortti ja lataa kenttä heti uudelleen, jotta
+  // nextMod-pohjaiset vaikutukset (siirrot, käpälä, kultakäpy) näkyvät.
+  panel.querySelectorAll("[data-boon]").forEach(b =>
+    b.addEventListener("click", () => {
+      if (!RUN) return;
+      BOON_CARDS.find(x => x.id === b.dataset.boon).apply();
+      newGame();
+      renderPerks();
+      panel.classList.remove("open");
+    }));
+
+  document.getElementById("devDraft").addEventListener("click", () => {
+    if (!RUN) return;
+    openDraft();
+    panel.classList.remove("open");
+  });
+  document.getElementById("devDrain").addEventListener("click", () => {
+    if (!RUN) return;
+    for (const id in PERKS) RUN.perks[id] = PERKS[id].max;
+    for (const id in CURSES) RUN.curses[id] = true;
+    RUN.amulets = AMULET_CAP;
+    renderPerks();
+  });
+  document.getElementById("devSiru").addEventListener("click", () => {
+    if (!RUN) return;
+    gainSiru();
+  });
 
   document.getElementById("devWin").addEventListener("click", () => {
     if (!RUN || RUN.finished) return;

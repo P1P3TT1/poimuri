@@ -26,3 +26,6 @@
   }
   #devPanel button:hover{ border-color:#e5b954; }
   #devPanel .wide{ width:100%; }
+  #devPanel .devnote{
+    font-size:.7rem; color:#9db3a4; line-height:1.35;
+  }
