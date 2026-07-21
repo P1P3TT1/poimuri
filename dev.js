@@ -8,7 +8,7 @@
     RUN = {
       act, stage, char: selectedChar,
       score: 0, berries: 0,
-      perks: {}, curses: {}, amulets: 3, sirut: 0, items: [],
+      perks: {}, curses: {}, amulets: 3, sirut: 0,
       spec: null, finished: false,
       sinceEnc: 0, pendingDraft: false, lastEnc: null, nextMod: null
     };
@@ -55,7 +55,6 @@
        <button id="devPerks">Kaikki varusteet</button>
        <button id="devDraft">Varustevalinta</button>
        <button id="devDrain">Ehdytä varustepooli</button>
-       <button id="devItem">+ esine</button>
        <button id="devSiru">+1 💠 siru</button>
        <button id="devBerry">+1000 🫐</button>
        <button id="devUnlock">Avaa hahmot</button>
@@ -133,10 +132,6 @@
     if (!RUN) return;
     for (const id in PERKS) RUN.perks[id] = PERKS[id].max;
     renderPerks();
-  });
-  document.getElementById("devItem").addEventListener("click", () => {
-    if (!RUN) return;
-    giveMysteryItem(); renderPerks();
   });
   document.getElementById("devBerry").addEventListener("click", () =>
     bankBerries(4000)); // /4-pankituksen läpi -> +1000

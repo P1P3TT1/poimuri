@@ -97,8 +97,11 @@ The three cards are normally two perks plus a third slot that is a curse (~25 %)
 | 🌰 **Kultakäpy** | Next stage starts with a joker on the board |
 | 🫐 **Marjasäkki** | +120 berries to the trek haul |
 | 💠 **Vaajan siru** | An amulet fragment — three fuse into an Ukonvaaja |
-| ❓ **Tuntematon esine** | A mystery item (see §6) |
+| 🐻 **Karhuntalja** (boss draft only) | +50 % damage in the next battle |
+| 🪵 **Tervaskanto** (boss draft only) | The boss's first attack fails |
 | ⚒️ **Hionta** (rare) | Push one owned stacking perk past its normal max |
+
+Karhuntalja and Tervaskanto only enter the pool when the *next* stage is a boss fight (stage 5 or 10).
 
 Curses can appear as one option among three, but you are never forced to take one.
 
@@ -121,13 +124,13 @@ The boss strikes every 2nd move. At half HP a main boss **enrages**: it strikes 
 
 Each boss has its own attack repertoire — Pakkanen leans hard on Halla, Louhi uses everything. The **Tietäjä** character sees the next two attacks in advance.
 
-**Survival order when a stage fails:** with zero Ukonvaajas, an **Ukonkivi** mystery item shatters to save you; otherwise one **Ukonvaaja** ⚡ is consumed and the stage restarts. With neither, the trek ends.
+**When a stage fails:** one **Ukonvaaja** ⚡ is consumed and the stage restarts. With none left, the trek ends.
 
 **Ukonvaajat** cap at 3; overflow converts to +300 p. Sources: beating a main boss, drafts, encounters, minigames (15+ gates), and three 💠 sirut fusing into one.
 
 ---
 
-## 6. Perks, curses and mystery items
+## 6. Perks, curses and battle boons
 
 ### Varusteet (perks)
 
@@ -154,18 +157,9 @@ Each boss has its own attack repertoire — Pakkanen leans hard on Halla, Louhi 
 
 A curse can be washed away at the **Kirkas lähde** or **Vanha noita** encounters.
 
-### Tuntemattomat esineet (❓ mystery items)
+### Eväskortit before a boss
 
-Effects stay hidden (unless you play Tietäjä) until their trigger moment. Each can be held only once at a time.
-
-| Item | Reveals at | Effect |
-|---|---|---|
-| 🐻 Karhuntalja | battle start | +50 % damage this battle |
-| 🦷 Hiidenhammas | battle start | Boss starts at −15 % HP |
-| 🪵 Tervaskanto | battle start | Boss's first attack fails |
-| 🥁 Noidanrumpu | battle start | +4 moves this battle |
-| 🧆 Eväskääry | field stage start | +3 moves this stage |
-| 🪨 Ukonkivi | on failure | Saves you when no Ukonvaajas remain |
+Two draft cards apply only to a boss fight and are offered only in the draft that precedes one (see §4): 🐻 **Karhuntalja** (+50 % damage) and 🪵 **Tervaskanto** (the boss's first attack fails).
 
 ---
 
@@ -176,12 +170,12 @@ Berries 🫐 are the trek's trade currency: encounters price their deals in berr
 | Encounter | Options |
 |---|---|
 | 🍄 **Outo sieni** | Taste: 50 % → 💠 siru +100 🫐, else a curse (or −2 moves). Puukko: safe +150 🫐. |
-| 👵 **Marjaeukko** | Trade a random perk for 2 ⚡ · buy a ❓ item for 250 🫐 |
+| 👵 **Marjaeukko** | Trade a random perk for 2 ⚡ · buy a mytty for 250 🫐 → 💠💠 |
 | 🪵 **Kaatunut kelo** | Puukko: carve → random perk (or ⚡) · climb: +150 🫐 but −2 moves next stage |
 | 💧 **Kirkas lähde** | Drink: washes a curse, or +4 moves next stage if curse-free |
-| 🏚 **Hylätty aitta** | Search: ❓ item (or 💠 siru) · rest: +3 moves next stage |
+| 🏚 **Hylätty aitta** | Search: 💠 siru · rest: +3 moves next stage |
 | 🐜 **Muurahaispesä** | Dig: 45 % → 💠 siru, else −2 moves · Tuohivirsut: guaranteed 💠 |
-| 🕳️ **Hiidenkirnu** | Reach in: 55 % → ❓ item or 💠, else −100 🫐 |
+| 🕳️ **Hiidenkirnu** | Reach in: 55 % → 💠 siru, else −100 🫐 |
 | 🧙 **Vanha noita** | Pay 200 🫐: removes a curse, or grants ⚡ if curse-free |
 | 🐻 **Karhunpesä** (act 1) | Peek: 50 % → Karhunkaato perk or +200 🫐, else −3 moves |
 | 🔥 **Nuotiopaikka** | Rest: +4 moves next stage · Reppu: +150 🫐 |
@@ -205,7 +199,7 @@ Between treks, spend banked berries in the shop:
 
 **Permanent upgrades:** Vankempi kori (harvest +2, 450 🫐) · Retkikartta (more encounters, 600 🫐) · Emännän eväät (first stage of each act +3 moves, 500 🫐) · Aitan avain (banking +20 %, 750 🫐)
 
-**Provisions** (one trek): Ukonvaaja matkaan (200 🫐) · Tuohikontti (random starting perk, 160 🫐) · Kääro (random starting ❓ item, 180 🫐)
+**Provisions** (one trek): Ukonvaaja matkaan (200 🫐) · Tuohikontti (random starting perk, 160 🫐)
 
 **Hero skill II** (900 🫐 each): see below.
 
@@ -216,7 +210,7 @@ Between treks, spend banked berries in the shop:
 | Character | Power | Skill II | Unlock |
 |---|---|---|---|
 | 🧺 **Poimija** | Harvest +4 conversions · starts with 1 ⚡ | Starts with 2 ⚡ | available from the start |
-| 🔮 **Tietäjä** | Sees the boss's next 2 attacks · identifies ❓ items | Bosses start −10 % HP | reach act 2 |
+| 🔮 **Tietäjä** | Sees the boss's next 2 attacks | Bosses start −10 % HP | reach act 2 |
 | 🗡️ **Karhunkaataja** | Boss damage +25 % · starts with Puukko · field stages −2 moves | Damage +40 % | complete the trek |
 
 ---

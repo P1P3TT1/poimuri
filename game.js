@@ -108,16 +108,14 @@ const ASSETS = {
   // eväskortit (varustevalinnan uusiutuvat kortit)
   boon_lepo: "🔥", boon_kapala: "🐾", boon_kapy: "🌰",
   boon_sakki: "🫐", boon_hionta: "⚒️",
+  boon_talja: "🐻", boon_tervas: "🪵",
   // minipelit
   mg_kapylintu: "🐦", mg_suohyppely: "🐸", mg_ahkio: "🛷",
   // hahmot
   char_poimija: "🧺", char_tietaja: "🔮", char_kaataja: "🗡️",
   // Aitan valikoima
   aitta_kori: "🧺", aitta_kartta: "🗺️", aitta_evaat: "🥯", aitta_avain: "🗝️",
-  aitta_vaaja: "⚡", aitta_kontti: "🎒", aitta_kaaro: "❓",
-  // tuntemattomat esineet
-  myst_karhuntalja: "🐻", myst_hiidenhammas: "🦷", myst_ukonkivi: "🪨",
-  myst_evaskaary: "🧆", myst_tervaskanto: "🪵", myst_noidanrumpu: "🥁",
+  aitta_vaaja: "⚡", aitta_kontti: "🎒",
   // pomojen iskut
   atk_freeze: "❄", atk_moss: "🌿", atk_steal: "🫳", atk_eat: "⏳",
   // polun kohtaamiset
@@ -164,8 +162,15 @@ const BOON_CARDS = [
   { id: "sakki",  icon: ico("boon_sakki"),  name: "Marjasäkki",   desc: "+120 🫐 matkasaaliiseen.",
     apply: () => { RUN.berries += 120; } },
   { id: "siru",   icon: ico("siru"),        name: "Vaajan siru",  desc: "Kolmesta sirusta syntyy ⚡ Ukonvaaja.",
-    apply: () => gainSiru() }
+    apply: () => gainSiru() },
+  /* Nämä kaksi jaetaan vain pomoa edeltävässä draftissa (ks. openDraft) */
+  { id: "talja",  icon: ico("boon_talja"),  name: "Karhuntalja",  desc: "Vahinko +50 % seuraavassa taistelussa.",
+    apply: () => addNextMod({ dmgMult: 0.5 }) },
+  { id: "tervas", icon: ico("boon_tervas"), name: "Tervaskanto",  desc: "Pomon ensimmäinen isku hukkaa.",
+    apply: () => addNextMod({ skipFirst: 1 }) }
 ];
+/* Eväskortit, jotka vaikuttavat vain taistelussa */
+const BOSS_ONLY_BOONS = ["talja", "tervas"];
 /* Varusteet, joita Hionta voi terästää yli maksimin (hyöty kasvaa lineaarisesti) */
 const HIONTA_OK = ["noppa", "hunaja", "kaato", "reppu", "vaskooli"];
 
@@ -198,14 +203,13 @@ const MINIGAMES = {
   }
 };
 
-/* Tuntemattomat esineet: vaikutus paljastuu vasta laukeamishetkellä */
 /* Hahmot: yksi auki alusta, kaksi avataan pelaamalla */
 const CHARS = {
   poimija: { icon: ico("char_poimija"), name: "Poimija",
     power: "Sadonkorjuu +4 muunnosta · aloitus ⚡ Ukonvaajalla",
     unlock: null },
   tietaja: { icon: ico("char_tietaja"), name: "Tietäjä",
-    power: "Näkee pomon 2 seuraavaa iskua · tunnistaa ❓-esineet heti",
+    power: "Näkee pomon 2 seuraavaa iskua",
     unlock: "Avautuu: pääse toiseen korpeen" },
   kaataja: { icon: ico("char_kaataja"), name: "Karhunkaataja",
     power: "Pomovahinko +25 % · 🔪 Puukko mukana · kentät −2 siirtoa",
@@ -222,23 +226,13 @@ const AITTA_GOODS = {
   ],
   once: [
     { id: "vaaja",  icon: ico("aitta_vaaja"),  name: "Ukonvaaja matkaan", desc: "Seuraava vaellus alkaa +1 vaajalla.", price: 200 },
-    { id: "kontti", icon: ico("aitta_kontti"), name: "Tuohikontti",       desc: "Seuraava vaellus alkaa satunnaisella varusteella.", price: 160 },
-    { id: "kaaro",  icon: ico("aitta_kaaro"),  name: "Kääro",             desc: "Seuraava vaellus alkaa tuntemattomalla esineellä.", price: 180 }
+    { id: "kontti", icon: ico("aitta_kontti"), name: "Tuohikontti",       desc: "Seuraava vaellus alkaa satunnaisella varusteella.", price: 160 }
   ],
   hero: [
     { id: "poimija2", char: "poimija", icon: ico("char_poimija"), name: "Poimijan taito II", desc: "Aloitusvaajoja kaksi.", price: 900 },
     { id: "tietaja2", char: "tietaja", icon: ico("char_tietaja"), name: "Tietäjän taito II", desc: "Pomot aloittavat 10 % heikompina.", price: 900 },
     { id: "kaataja2", char: "kaataja", icon: ico("char_kaataja"), name: "Kaatajan taito II", desc: "Pomovahinko +40 %.", price: 900 }
   ]
-};
-
-const MYSTERY_ITEMS = {
-  karhuntalja:  { icon: ico("myst_karhuntalja"),  name: "Karhuntalja",  reveal: "vahinko +50 % tässä taistelussa!" },
-  hiidenhammas: { icon: ico("myst_hiidenhammas"), name: "Hiidenhammas", reveal: "pomo aloittaa heikentyneenä!" },
-  ukonkivi:     { icon: ico("myst_ukonkivi"),     name: "Ukonkivi",     reveal: "kivi murskautuu ja pelastaa sinut!" },
-  evaskaary:    { icon: ico("myst_evaskaary"),    name: "Eväskääry",    reveal: "+3 siirtoa tähän kenttään!" },
-  tervaskanto:  { icon: ico("myst_tervaskanto"),  name: "Tervaskanto",  reveal: "pomon ensimmäinen isku hukkaa!" },
-  noidanrumpu:  { icon: ico("myst_noidanrumpu"),  name: "Noidanrumpu",  reveal: "+4 siirtoa tähän taisteluun!" }
 };
 
 const MOSS_ICON =
@@ -1979,7 +1973,7 @@ const invBadge   = document.getElementById("invBadge");
 function renderPerks(){
   if (mode !== "run" || !RUN){ invBtn.classList.add("hidden"); return; }
   invBtn.classList.remove("hidden");
-  const n = Object.keys(RUN.perks).length + Object.keys(RUN.curses).length + RUN.items.length;
+  const n = Object.keys(RUN.perks).length + Object.keys(RUN.curses).length;
   invBadge.innerHTML =
     (RUN.amulets > 0 ? `⚡${RUN.amulets} ` : "") +
     (RUN.sirut ? `💠${RUN.sirut} ` : "") +
@@ -2017,16 +2011,6 @@ function renderInventory(){
     html += `<div class="shop-section">Kiroukset</div><div class="cards">`;
     for (const id of curseIds)
       html += card(CURSES[id].icon, CURSES[id].name, CURSES[id].desc, " curse");
-    html += `</div>`;
-  }
-  if (RUN.items.length){
-    html += `<div class="shop-section">Esineet</div><div class="cards">`;
-    for (const id of RUN.items){
-      const it = MYSTERY_ITEMS[id];
-      html += charIs("tietaja")
-        ? card(it.icon, it.name, "Paljastuu: " + it.reveal)
-        : card("❓", "Tuntematon esine", "Vaikutus paljastuu, kun sen hetki koittaa.");
-    }
     html += `</div>`;
   }
   invBody.innerHTML = html;
@@ -2147,7 +2131,7 @@ function startRun(){
   RUN = {
     act: 1, stage: 1, char: selectedChar,
     score: 0, berries: 0,
-    perks: {}, curses: {}, amulets: 0, sirut: 0, items: [],
+    perks: {}, curses: {}, amulets: 0, sirut: 0,
     spec: null, finished: false,
     sinceEnc: 0, pendingDraft: false, lastEnc: null, nextMod: null
   };
@@ -2157,7 +2141,6 @@ function startRun(){
   // Aitasta pakatut eväät kuluvat nyt
   if (provisions.vaaja){ gainAmulet(); }
   if (provisions.kontti){ grantRandomPerk(); }
-  if (provisions.kaaro){ giveMysteryItem(); }
   provisions = {};
   Store.set("provisions", provisions);
   RUN.spec = nextSpec();
@@ -2226,14 +2209,6 @@ function runLevelFail(){
   gameOver = true;
   resetIdle();
   boardEl.classList.remove("enrage");
-  if (RUN.amulets === 0 && RUN.items.includes("ukonkivi")){
-    consumeItem("ukonkivi");
-    ovTitle.textContent = "Ukonkivi pelasti!";
-    ovText.innerHTML = `Kivi murskautuu ja imee iskun – sama kenttä alkaa alusta.`;
-    ovBtn.textContent = "Jatka vaellusta";
-    overlay.classList.add("show");
-    return;
-  }
   if (RUN.amulets > 0){
     RUN.amulets--;
     Sfx.crack();
@@ -2292,7 +2267,7 @@ function updateRunRecord(){
 
 /* Varustevalinta: kaksi varustetta + kolmas paikka (kirous/vaaja/varuste).
    Kun varustepooli ehtyy, tyhjät paikat täytetään uusiutuvilla korteilla
-   (eväskortit, ❓-esineet, Hionta, siru) – valinta ei koskaan tyhjene
+   (eväskortit, Hionta, siru) – valinta ei koskaan tyhjene
    pelkäksi pistedumpiksi eikä pakota kiroukseen. */
 function openDraft(){
   const slots = [];
@@ -2314,10 +2289,11 @@ function openDraft(){
     const p3 = takePerk();
     if (p3) slots.push(p3);
   }
-  // täydennys uusiutuvista korteista
-  const fillers = BOON_CARDS.map(b => ({ kind: "boon", id: b.id }));
-  if (Object.keys(MYSTERY_ITEMS).some(id => !RUN.items.includes(id)))
-    fillers.push({ kind: "item" });
+  // täydennys uusiutuvista korteista; RUN.stage on jo *tuleva* etappi
+  const bossNext = RUN.stage === 5 || RUN.stage === 10;
+  const fillers = BOON_CARDS
+    .filter(b => bossNext || !BOSS_ONLY_BOONS.includes(b.id))
+    .map(b => ({ kind: "boon", id: b.id }));
   const hCand = HIONTA_OK.filter(id => RUN.perks[id]);
   if (hCand.length && Math.random() < 0.25)
     fillers.push({ kind: "hionta", id: hCand[Math.floor(Math.random() * hCand.length)] });
@@ -2332,8 +2308,6 @@ function openDraft(){
   : s.kind === "curse"  ? CURSES[s.id]
   : s.kind === "amulet" ? AMULET
   : s.kind === "boon"   ? BOON_CARDS.find(b => b.id === s.id)
-  : s.kind === "item"   ? { icon: "❓", name: "Tuntematon esine",
-                            desc: "Vaikutus paljastuu, kun sen hetki koittaa." }
   : /* hionta */          { icon: ico("boon_hionta"), name: "Hionta: " + PERKS[s.id].name,
                             desc: `Terästä varuste yli äärirajan: +1 taso (omistat ×${RUN.perks[s.id]}).` };
 
@@ -2353,7 +2327,6 @@ function openDraft(){
                                    RUN.perks[s.id] = (RUN.perks[s.id] || 0) + 1;
       else if (s.kind === "curse") RUN.curses[s.id] = true;
       else if (s.kind === "boon")  BOON_CARDS.find(b => b.id === s.id).apply();
-      else if (s.kind === "item")  giveMysteryItem();
       else                         gainAmulet();
       Sfx.born();
       draftOverlay.classList.remove("show");
@@ -2382,23 +2355,6 @@ function grantRandomPerk(){
   RUN.perks[id] = (RUN.perks[id] || 0) + 1;
   return id;
 }
-function giveMysteryItem(){
-  const cand = Object.keys(MYSTERY_ITEMS).filter(id => !RUN.items.includes(id));
-  if (!cand.length) return null;
-  const id = cand[Math.floor(Math.random() * cand.length)];
-  RUN.items.push(id);
-  return id;
-}
-function consumeItem(id){
-  const i = RUN.items.indexOf(id);
-  if (i === -1) return false;
-  RUN.items.splice(i, 1);
-  showBanner(`❓ ${MYSTERY_ITEMS[id].name}: ${MYSTERY_ITEMS[id].reveal}`);
-  Sfx.born();
-  renderPerks();
-  return true;
-}
-
 const ENCOUNTERS = [
   { id: "sieni", icon: ico("ev_sieni"), title: "Outo sieni",
     text: "Mättäällä hohtaa sieni, jollaista et ole koskaan nähnyt. Se tuoksuu makealta.",
@@ -2432,13 +2388,11 @@ const ENCOUNTERS = [
           return `Eukko vie <b>${PERKS[id].name}</b> ja ojentaa <b>${g} ⚡ Ukonvaajaa</b>` +
             (g < 2 ? " (loput painuvat pisteiksi)" : "") + ".";
         } },
-      { label: "Osta mytty", desc: "250 🫐 → tuntematon esine", minBerries: 250,
+      { label: "Osta mytty", desc: "250 🫐 → 💠💠 kaksi vaajan sirua", minBerries: 250,
         act(){
           RUN.berries -= 250;
-          const it = giveMysteryItem();
-          if (it) return "Saat kankaisen mytyn. <b>❓ Tuntematon esine</b>";
-          RUN.berries += 250;
-          return "Eukon kori onkin tyhjä – saat marjasi takaisin.";
+          gainSiru(2);
+          return "Mytystä kirpoaa kaksi kimaltavaa sirua. <b>💠💠</b>";
         } },
       { label: "Kiitä ja jatka", desc: "",
         act(){ return "Eukko hymyilee hampaattomasti ja jatkaa poimimista."; } }
@@ -2504,12 +2458,10 @@ const ENCOUNTERS = [
   { id: "aitta", icon: ico("ev_aitta"), title: "Hylätty aitta",
     text: "Metsän keskellä nojaa vino, harmaantunut aitta. Ovi on raollaan.",
     choices: [
-      { label: "Tutki sisältö", desc: "Jotain jää käteen – mutta mitä?",
+      { label: "Tutki sisältö", desc: "Nurkasta löytyy 💠 vaajan siru",
         act(){
-          const it = giveMysteryItem();
-          if (it) return "Nurkassa lojuu jotain kankaaseen käärittynä. <b>❓ Tuntematon esine</b>";
           gainSiru();
-          return "Vain vanhoja tuohia – ja niiden alta kimaltaa. <b>💠 Vaajan siru</b>";
+          return "Vanhojen tuohien alta kimaltaa. <b>💠 Vaajan siru</b>";
         } },
       { label: "Lepää portailla", desc: "Seuraava kenttä +3 siirtoa",
         act(){ addNextMod({ moves: 3 }); return "Hetken lepo tekee terää. <b>+3 siirtoa</b> seuraavaan."; } }
@@ -2537,8 +2489,6 @@ const ENCOUNTERS = [
       { label: "Kurota pohjalle", desc: "Kilinä lupaa – mutta kuoppa on syvä",
         act(){
           if (Math.random() < 0.55){
-            const it = giveMysteryItem();
-            if (it) return "Sormet osuvat johonkin kääröön. <b>❓ Tuntematon esine</b>";
             gainSiru();
             return "Pohjalla kimaltaa ukonvaajan siru. <b>💠 Vaajan siru</b>";
           }
@@ -3420,37 +3370,18 @@ function newGame(){
       BATTLE.next2 = BATTLE.attacks[Math.floor(Math.random() * BATTLE.attacks.length)];
       if (owned[RUN.char + "2"] && RUN.char === "tietaja")
         BATTLE.hp = BATTLE.maxHp = Math.round(BATTLE.hp * 0.9);
-      // tuntemattomat esineet paljastuvat taistelun alkaessa
-      if (RUN.items.includes("karhuntalja")){
-        setTimeout(() => consumeItem("karhuntalja"), 1400);
-        BATTLE.dmgMult = 1.5;
-      }
-      if (RUN.items.includes("hiidenhammas")){
-        setTimeout(() => consumeItem("hiidenhammas"), 2600);
-        BATTLE.hp = BATTLE.maxHp = Math.round(BATTLE.hp * 0.85);
-      }
-      if (RUN.items.includes("tervaskanto")){
-        setTimeout(() => consumeItem("tervaskanto"), 3800);
-        BATTLE.skipFirst = true;
-      }
-      if (RUN.items.includes("noidanrumpu")){
-        setTimeout(() => consumeItem("noidanrumpu"), 5000);
-        moves += 4;
-      }
     } else {
       BATTLE = null;
       if (charIs("kaataja")) moves = Math.max(8, moves - 2);
       if (permOwned("evaat") && RUN.stage === 1) moves += 3;
-      // eväskääry paljastuu tavoitekentän alussa
-      if (RUN.items.includes("evaskaary")){
-        setTimeout(() => consumeItem("evaskaary"), 1400);
-        moves += 3;
-      }
     }
     // kohtaamisten ja eväskorttien kenttämodifikaattorit (lepo, väsymys...)
     NM = RUN.nextMod;
     RUN.nextMod = null;
     if (NM && NM.moves) moves = Math.max(6, moves + NM.moves);
+    // taistelukohtaiset eväskortit (Karhuntalja, Tervaskanto)
+    if (BATTLE && NM && NM.dmgMult) BATTLE.dmgMult = 1 + NM.dmgMult;
+    if (BATTLE && NM && NM.skipFirst) BATTLE.skipFirst = true;
     collectGoals = {};
     for (const t in (S.collect || {}))
       collectGoals[t] = Math.round(S.collect[t] * (curseOn("ahneus") ? 1.25 : 1));
@@ -3741,7 +3672,7 @@ document.getElementById("guideBody").innerHTML = `
      Kenttien välissä valitaan varuste, kirous tai ${AMULET.icon} vaaja – ja häviö päättää
      vaelluksen, ellei <span class="sp-name">Ukonvaaja</span> suojele (kantomäärä enintään
      kolme, ylimenevät muuttuvat pisteiksi). Pääpomon kaataminen antaa vaajan, miniboss
-     pistepotin. Keräämäsi varusteet, kiroukset ja esineet löytyvät tilastorivin
+     pistepotin. Keräämäsi varusteet ja kiroukset löytyvät tilastorivin
      🎒 <span class="sp-name">Repusta</span> kuvauksineen. Kaikki poimitut marjat kertyvät
      pysyvään <span class="sp-name">Aittaan</span>, josta ostetaan pysyviä parannuksia, eväitä
      ja hahmonkehitystä. Kolme <span class="sp-name">hahmoa</span> pelataan auki: Poimija
@@ -3756,9 +3687,10 @@ document.getElementById("guideBody").innerHTML = `
      <span class="sp-name">raivostuu</span> ja iskee joka siirrolla.</p>
   <p>Kenttien välissä polku johtaa <span class="sp-name">kohtaamisiin</span>: riskivalintoja,
      vaihtokauppoja ja minipelejä – jokaisella alueella omansa (🐦 Käpylintu, 🐸 Suohyppely,
-     🛷 Ahkio). Osa valinnoista aukeaa vain oikealla varusteella, ja
-     ❓ <span class="sp-name">tuntemattomien esineiden</span> vaikutus paljastuu vasta,
-     kun niiden hetki koittaa.</p>
+     🛷 Ahkio). Osa valinnoista aukeaa vain oikealla varusteella. Varustevalinnassa
+     voi osua myös <span class="sp-name">eväskortti</span>, joka vaikuttaa vain seuraavaan
+     kenttään – pomoa edeltävässä valinnassa tarjolla ovat lisäksi 🐻 Karhuntalja
+     (vahinko +50 %) ja 🪵 Tervaskanto (pomon ensimmäinen isku hukkaa).</p>
   <h3>Esteet ja erikoisuudet</h3>
   <p>Alueilla on omat oikkunsa: Suossa <span class="sp-name">usva</span> peittää paloja –
      peitetyn palan laji paljastuu vasta osumasta, mutta sokkona vaihtaminenkin on sallittua.
