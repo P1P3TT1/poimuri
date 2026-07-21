@@ -10,7 +10,8 @@
       score: 0, berries: 0,
       perks: {}, curses: {}, amulets: 3, sirut: 0,
       spec: null, finished: false,
-      sinceEnc: 0, pendingDraft: false, lastEnc: null, nextMod: null
+      sinceEnc: 0, pendingDraft: false, lastEnc: null, nextMod: null,
+      nextEnc: null, encStage: 0
     };
   }
   function enterField(act, stage){

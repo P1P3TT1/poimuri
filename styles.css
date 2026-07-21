@@ -175,6 +175,42 @@
   .goals .ci{ width:22px; height:22px; display:inline-block; }
   .goals .ci svg{ width:100%; height:100%; display:block; }
 
+  /* Tietäjän ennakointi: oma himmeä rivi, joka näyttää polulla edessä
+     odottavan kohtaamisen (ei tungeksi tavoiterivin kanssa) */
+  .foresee{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:6px;
+    width:fit-content;
+    max-width:92vw;
+    margin:0 auto 8px;
+    padding:3px 14px 3px 12px;
+    border:1px dashed #4a6a86;
+    border-radius:999px;
+    background:rgba(74,106,134,.12);
+    font-size:.82rem;
+    font-weight:700;
+    color:var(--cream-dim);
+    white-space:nowrap;
+  }
+  .foresee::before{
+    content:"·· ▷";
+    letter-spacing:2px;
+    opacity:.55;
+    color:#7ea6c4;
+  }
+  .foresee.hidden{ display:none; }
+  .foresee .ico{ width:20px; height:20px; display:inline-block; }
+  .foresee .ico svg{ width:100%; height:100%; display:block; }
+  .foresee .fore-label{
+    font-size:.62rem;
+    letter-spacing:.08em;
+    text-transform:uppercase;
+    opacity:.7;
+  }
+  .foresee .fore-name{ color:var(--cream); }
+
   .mosscell{
     position:absolute;
     border-radius:10px;

@@ -209,7 +209,7 @@ const CHARS = {
     power: "Sadonkorjuu +4 muunnosta · aloitus ⚡ Ukonvaajalla",
     unlock: null },
   tietaja: { icon: ico("char_tietaja"), name: "Tietäjä",
-    power: "Näkee pomon 2 seuraavaa iskua",
+    power: "Näkee tulevan kohtaamisen polulla",
     unlock: "Avautuu: pääse toiseen korpeen" },
   kaataja: { icon: ico("char_kaataja"), name: "Karhunkaataja",
     power: "Pomovahinko +25 % · 🔪 Puukko mukana · kentät −2 siirtoa",
@@ -230,7 +230,7 @@ const AITTA_GOODS = {
   ],
   hero: [
     { id: "poimija2", char: "poimija", icon: ico("char_poimija"), name: "Poimijan taito II", desc: "Aloitusvaajoja kaksi.", price: 900 },
-    { id: "tietaja2", char: "tietaja", icon: ico("char_tietaja"), name: "Tietäjän taito II", desc: "Pomot aloittavat 10 % heikompina.", price: 900 },
+    { id: "tietaja2", char: "tietaja", icon: ico("char_tietaja"), name: "Tietäjän taito II", desc: "Näkee pomon 2 seuraavaa iskua.", price: 900 },
     { id: "kaataja2", char: "kaataja", icon: ico("char_kaataja"), name: "Kaatajan taito II", desc: "Pomovahinko +40 %.", price: 900 }
   ]
 };
@@ -1036,6 +1036,7 @@ const movesLabel   = document.getElementById("movesLabel");
 const movesStat    = document.getElementById("movesStat");
 const bestEl   = document.getElementById("best");
 const goalsEl  = document.getElementById("goals");
+const foreseeEl = document.getElementById("foresee");
 const bestLabel = document.getElementById("bestLabel");
 const draftOverlay = document.getElementById("draftOverlay");
 const draftCards   = document.getElementById("draftCards");
@@ -1788,6 +1789,21 @@ function renderGoals(){
   goalsEl.innerHTML = html;
 }
 
+/* Tietäjän perustaito: näytä tulevan kohtaamisen ikoni ja nimi kentän
+   aikana. Vain tavoitekentissä (ei taistelussa) ja vain Tietäjällä. */
+function renderForesee(){
+  if (!foreseeEl) return;
+  if (!RUN || BATTLE || !charIs("tietaja") || !RUN.nextEnc){
+    foreseeEl.classList.add("hidden");
+    foreseeEl.innerHTML = "";
+    return;
+  }
+  const e = ENCOUNTERS.find(x => x.id === RUN.nextEnc);
+  if (!e){ foreseeEl.classList.add("hidden"); foreseeEl.innerHTML = ""; return; }
+  foreseeEl.classList.remove("hidden");
+  foreseeEl.innerHTML = `<span class="fore-label">Edessä</span>${e.icon}<span class="fore-name">${e.title}</span>`;
+}
+
 function denyIce(cell){
   Sfx.invalid();
   setSelected(null);
@@ -1863,7 +1879,7 @@ function renderBossBar(){
   bossbarEl.classList.toggle("enraged", BATTLE.enraged);
   const info = ATTACK_INFO[BATTLE.next];
   const pct = Math.max(0, BATTLE.hp / BATTLE.maxHp * 100);
-  const seer = charIs("tietaja") ? " → " + ATTACK_INFO[BATTLE.next2].icon : "";
+  const seer = charIs("tietaja") && heroUpgraded() ? " → " + ATTACK_INFO[BATTLE.next2].icon : "";
   bossbarEl.innerHTML =
     `<div class="brow">` +
     `<span class="bname">${BATTLE.enraged ? "🔥 " : ""}${BATTLE.name}</span>` +
@@ -2087,6 +2103,7 @@ function showMainMenu(){
   busy = false;
   renderPerks();
   renderBossBar();
+  renderForesee();
   updateStats();
   const recLine = record
     ? `<br>Pisin vaellus: <b>${record.act}. korpi · ${record.stage}/10</b> (${record.score} p)`
@@ -2133,7 +2150,8 @@ function startRun(){
     score: 0, berries: 0,
     perks: {}, curses: {}, amulets: 0, sirut: 0,
     spec: null, finished: false,
-    sinceEnc: 0, pendingDraft: false, lastEnc: null, nextMod: null
+    sinceEnc: 0, pendingDraft: false, lastEnc: null, nextMod: null,
+    nextEnc: null, encStage: 0
   };
   // hahmon aloitusedut
   if (RUN.char === "poimija") RUN.amulets = heroUpgraded() ? 2 : 1;
@@ -2651,12 +2669,30 @@ function trailHTML(){
   return s + `</div><div class="trail-label">${["Ensimmäinen","Toinen","Kolmas"][RUN.act - 1]} korpi · ${ACTS[RUN.act - 1].name}</div>`;
 }
 
-function proceedBetweenStages(){
+/* Arvo kentän välissä odottava tapahtuma etukäteen (kutsutaan kentän
+   alkaessa), jotta Tietäjä ehtii nähdä sen. Tallentaa RUN.nextEnc:iin
+   joko kohtaamisen id:n tai null (ei kohtaamista – pelkkä varustevalinta).
+   sinceEnc-laskuri kasvaa täällä; ehto ja arvat pysyvät ennallaan, joten
+   kohtaamisten tiheys ei muutu. */
+function rollNextEncounter(){
   RUN.sinceEnc = (RUN.sinceEnc || 0) + 1;
   if (RUN.sinceEnc >= 2 && Math.random() < (permOwned("kartta") ? 0.8 : 0.6)){
+    const pool = ENCOUNTERS.filter(e =>
+      (!e.act || e.act === RUN.act) && e.id !== RUN.lastEnc);
+    RUN.nextEnc = pool.length
+      ? pool[Math.floor(Math.random() * pool.length)].id
+      : null;
+  } else {
+    RUN.nextEnc = null;
+  }
+}
+
+function proceedBetweenStages(){
+  if (RUN.nextEnc){
     RUN.sinceEnc = 0;
     RUN.pendingDraft = true; // kohtaamisen jälkeen vielä varustevalinta
-    openEncounter();
+    openEncounter(ENCOUNTERS.find(e => e.id === RUN.nextEnc));
+    RUN.nextEnc = null;
   } else {
     openDraft();
   }
@@ -3368,8 +3404,6 @@ function newGame(){
       };
       BATTLE.next = BATTLE.attacks[Math.floor(Math.random() * BATTLE.attacks.length)];
       BATTLE.next2 = BATTLE.attacks[Math.floor(Math.random() * BATTLE.attacks.length)];
-      if (owned[RUN.char + "2"] && RUN.char === "tietaja")
-        BATTLE.hp = BATTLE.maxHp = Math.round(BATTLE.hp * 0.9);
     } else {
       BATTLE = null;
       if (charIs("kaataja")) moves = Math.max(8, moves - 2);
@@ -3439,11 +3473,19 @@ function newGame(){
     }
   }
 
+  // arvo tämän kentän jälkeinen tapahtuma ennalta (kerran per kenttä,
+  // ei uudelleen Ukonvaaja-pelastuksen jälkeen samaan kenttään)
+  if (RUN.encStage !== runDepth()){
+    RUN.encStage = runDepth();
+    rollNextEncounter();
+  }
+
   measure();
   buildCellBackgrounds();
   buildMossEls();
   rebuildBoardDOM();
   renderGoals();
+  renderForesee();
   updateCursorRing();
   updateStats();
   renderPerks();

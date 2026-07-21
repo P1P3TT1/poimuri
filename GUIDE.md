@@ -122,7 +122,7 @@ The boss strikes every 2nd move. At half HP a main boss **enrages**: it strikes 
 | 🫳 **Ryöstö** | Steals a special piece from the board (or a move if there are none; enraged also −1 move) |
 | ⏳ **Ahmaisu** | Eats one move |
 
-Each boss has its own attack repertoire — Pakkanen leans hard on Halla, Louhi uses everything. The **Tietäjä** character sees the next two attacks in advance.
+Each boss has its own attack repertoire — Pakkanen leans hard on Halla, Louhi uses everything. Everyone sees the boss's *next* attack telegraphed; **Tietäjä** with skill II also sees the one after that.
 
 **When a stage fails:** one **Ukonvaaja** ⚡ is consumed and the stage restarts. With none left, the trek ends.
 
@@ -210,7 +210,7 @@ Between treks, spend banked berries in the shop:
 | Character | Power | Skill II | Unlock |
 |---|---|---|---|
 | 🧺 **Poimija** | Harvest +4 conversions · starts with 1 ⚡ | Starts with 2 ⚡ | available from the start |
-| 🔮 **Tietäjä** | Sees the boss's next 2 attacks | Bosses start −10 % HP | reach act 2 |
+| 🔮 **Tietäjä** | Sees the upcoming encounter on the path | Sees the boss's next 2 attacks | reach act 2 |
 | 🗡️ **Karhunkaataja** | Boss damage +25 % · starts with Puukko · field stages −2 moves | Damage +40 % | complete the trek |
 
 ---
@@ -231,6 +231,6 @@ Between treks, spend banked berries in the shop:
 ## 11. Versions
 
 - `index.html` — the game.
-- `poimuri-dev.html` — same game plus a developer panel (🛠 bottom right) for jumping to any stage, boss, encounter or minigame, granting perks/items/berries, and wiping the save.
+- `poimuri-dev.html` — same game plus a developer panel (🛠 bottom right) for jumping to any stage, boss, encounter or minigame, granting perks/berries, and wiping the save.
 
 Saving (Aitta, records, unlocks) uses `localStorage`; in sandboxed previews progress lasts only for the session.
